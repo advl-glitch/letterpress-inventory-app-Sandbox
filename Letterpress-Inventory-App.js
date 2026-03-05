@@ -569,6 +569,7 @@ async function renderMasterItemsPage() {
         <p class="page-subtitle">All designs in your collection</p>
       </div>
       <div class="page-actions">
+        <button class="btn btn-secondary" onclick="refreshInventory()">↺ Refresh</button>
         <button class="btn btn-primary" onclick="document.querySelector('[data-page=new-item-design]').click()">✚ Add Design</button>
       </div>
     </div>
@@ -618,11 +619,20 @@ async function renderMasterItemsPage() {
   loadFilterPanel();
 
   document.getElementById('items-search')?.addEventListener('input', (e) => {
-    const q        = e.target.value.toLowerCase();
-    const filtered = (itemsCache || []).filter(item =>
-      (item.DisplayName || item.Name || '').toLowerCase().includes(q) ||
-      String(item.ItemID).includes(q)
-    );
+    const q    = e.target.value.toLowerCase();
+    // Always start from full cache, then apply active tag filters, then text
+    let pool   = itemsCache || [];
+    if (activeTagFilters.size > 0) {
+      pool = pool.filter(item => {
+        const tagIds = item._tagIds || [];
+        return [...activeTagFilters].some(tagId => tagIds.includes(tagId));
+      });
+    }
+    const filtered = q
+      ? pool.filter(item =>
+          (item.DisplayName || item.Name || '').toLowerCase().includes(q) ||
+          String(item.ItemID).includes(q))
+      : pool;
     currentItems = filtered;
     const isGrid = document.getElementById('grid-view-btn').classList.contains('active');
     isGrid ? renderItemsGrid(filtered) : renderItemsList(filtered);
@@ -684,9 +694,14 @@ function closeFilterPanel() {
 
 function clearAllFilters() {
   activeTagFilters.clear();
+  const searchInput = document.getElementById('items-search');
+  if (searchInput) searchInput.value = '';
   renderFilterPanelBody();
   updateActiveFiltersBar();
   currentItems = itemsCache || [];
+  const count = document.getElementById('filter-count');
+  if (count) { count.style.display = 'none'; }
+  document.getElementById('filter-btn')?.classList.remove('has-filters');
   const isGrid = document.getElementById('grid-view-btn')?.classList.contains('active');
   isGrid ? renderItemsGrid(currentItems) : renderItemsList(currentItems);
 }
@@ -694,7 +709,15 @@ function clearAllFilters() {
 function applyFilters() {
   closeFilterPanel();
   updateActiveFiltersBar();
-  currentItems = itemsCache || [];
+  const allItems = itemsCache || [];
+  if (activeTagFilters.size > 0) {
+    currentItems = allItems.filter(item => {
+      const tagIds = item._tagIds || [];
+      return [...activeTagFilters].some(tagId => tagIds.includes(tagId));
+    });
+  } else {
+    currentItems = allItems;
+  }
   const count = document.getElementById('filter-count');
   if (count) {
     if (activeTagFilters.size > 0) {
@@ -732,6 +755,7 @@ async function fetchAndDisplayItems() {
     if (!itemsCache) {
       const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getItems`);
       const data     = await response.json();
+      // _tagIds are bundled into each item by the server
       if (data.success) itemsCache = data.items.filter(i => i.ItemID);
     }
     currentItems = itemsCache || [];
@@ -739,6 +763,18 @@ async function fetchAndDisplayItems() {
   } catch (e) {
     document.getElementById('items-container').innerHTML = dogError('Couldn\'t load items. Check your connection.');
   }
+}
+
+async function refreshInventory() {
+  itemsCache = null;
+  tagsCache  = null;
+  activeTagFilters.clear();
+  const searchInput = document.getElementById('items-search');
+  if (searchInput) searchInput.value = '';
+  document.getElementById('items-container').innerHTML = dogLoading('Refreshing...');
+  await fetchAndDisplayItems();
+  await loadFilterPanel();
+  showToast('Inventory refreshed!', 'success');
 }
 
 function isNewItem(item) {
@@ -881,7 +917,15 @@ function openEditItemModal(itemId) {
       <div id="edit-item-status" class="form-status"></div>
     </form>`);
 
-  loadTagsForEdit('edit-tags-container', []);
+  (async () => {
+    try {
+      const r = await fetch(`${GOOGLE_SCRIPT_URL}?action=getItemTags&itemId=${itemId}`);
+      const d = await r.json();
+      loadTagsForEdit('edit-tags-container', d.success ? d.tagIds : []);
+    } catch(e) {
+      loadTagsForEdit('edit-tags-container', []);
+    }
+  })();
   document.getElementById('edit-item-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const status       = document.getElementById('edit-item-status');
@@ -917,9 +961,8 @@ function openEditItemModal(itemId) {
 async function handlePhotoUpload(input) {
   const file     = input.files[0];
   if (!file) return;
-  const statusEl  = document.getElementById('photo-upload-status');
-  const urlInput  = document.getElementById('edit-photo-url');
-  if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = 'var(--teal)'; statusEl.textContent = 'Processing photo...'; }
+  const statusEl = document.getElementById('photo-upload-status');
+  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Processing photo...'; }
   const canvas = document.createElement('canvas');
   const img    = new Image();
   const reader = new FileReader();
@@ -934,26 +977,14 @@ async function handlePhotoUpload(input) {
       const base64 = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
       if (statusEl) statusEl.textContent = 'Uploading to Drive...';
       try {
-        const controller = new AbortController();
-        const timeout    = setTimeout(() => controller.abort(), 30000);
-        const r          = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'uploadPhoto', base64, filename: file.name }), signal: controller.signal });
-        clearTimeout(timeout);
+        const r      = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'uploadPhoto', base64, filename: file.name }) });
         const result = await r.json();
         if (result.success && result.url) {
-          if (urlInput) urlInput.value = result.url;
-          // Show a live preview on success
-          let previewWrap = document.querySelector('.photo-preview-wrap');
-          if (!previewWrap) {
-            previewWrap = document.createElement('div');
-            previewWrap.className = 'photo-preview-wrap';
-            document.querySelector('.photo-upload-area')?.before(previewWrap);
-          }
-          previewWrap.innerHTML = `<img class="photo-preview-thumb" src="${result.url}" alt="Uploaded photo">`;
+          document.getElementById('edit-photo-url').value = result.url;
           if (statusEl) { statusEl.textContent = '✅ Photo uploaded!'; statusEl.style.color = 'var(--green)'; }
         } else throw new Error(result.error || 'Upload failed');
       } catch (err) {
-        const msg = err.name === 'AbortError' ? 'Upload timed out — check your connection.' : 'Drive upload failed: ' + err.message;
-        if (statusEl) { statusEl.textContent = '⚠️ ' + msg; statusEl.style.color = 'var(--amber)'; }
+        if (statusEl) { statusEl.textContent = '⚠️ Drive upload unavailable — paste URL manually.'; statusEl.style.color = 'var(--amber)'; }
       }
     };
     img.src = e.target.result;
@@ -2146,8 +2177,9 @@ function initReportCharts() {
 // ============================================================
 // INVENTORY AUDITOR
 // ============================================================
+
 // Stores unsaved audit input values across re-renders
-let auditPendingValues = {}; // { itemId: { stock: '5', retired: true } }
+let auditPendingValues = {};
 
 async function renderInventoryAuditorPage() {
   auditPendingValues = {};
@@ -2212,7 +2244,6 @@ async function refreshAuditPage() {
   await loadAuditItems();
 }
 
-// Snapshot all current input values into auditPendingValues before re-render
 function saveAuditInputState() {
   document.querySelectorAll('.audit-new-input').forEach(input => {
     const id = input.dataset.itemId;
@@ -2241,9 +2272,9 @@ function renderAuditCards(items) {
   if (!container || !items) return;
   container.innerHTML = `
     ${items.map(item => {
-      const pending     = auditPendingValues[String(item.ItemID)] || {};
-      const stockVal    = pending.stock !== undefined ? pending.stock : '';
-      const isRetired   = pending.retired !== undefined ? pending.retired : (item.Status === 'Retired');
+      const pending   = auditPendingValues[String(item.ItemID)] || {};
+      const stockVal  = pending.stock !== undefined ? pending.stock : '';
+      const isRetired = pending.retired !== undefined ? pending.retired : (item.Status === 'Retired');
       return `
       <div class="audit-card audit-card-${auditSizeMode}">
         <div class="audit-card-info">
@@ -2268,9 +2299,7 @@ function renderAuditCards(items) {
 }
 
 async function saveAudit() {
-  // Capture current state before reading
   saveAuditInputState();
-
   const updates = [];
   const retires = [];
 
@@ -2283,14 +2312,14 @@ async function saveAudit() {
   document.querySelectorAll('.retire-checkbox').forEach(cb => {
     const item          = (itemsCache || []).find(i => String(i.ItemID) === String(cb.dataset.itemId));
     const currentStatus = item?.Status || 'Open';
-    if (cb.checked && currentStatus !== 'Retired')   retires.push(cb.dataset.itemId);
-    if (!cb.checked && currentStatus === 'Retired')  retires.push({ itemId: cb.dataset.itemId, restore: true });
+    if (cb.checked && currentStatus !== 'Retired')  retires.push(cb.dataset.itemId);
+    if (!cb.checked && currentStatus === 'Retired') retires.push({ itemId: cb.dataset.itemId, restore: true });
   });
 
   if (updates.length === 0 && retires.length === 0) { showToast('No changes entered', ''); return; }
   showToast('Saving...', '');
 
-  // FIX: use 'updateAuditStock' action — NOT 'updateItem' which would corrupt the card name
+  // Use updateAuditStock — NOT updateItem — to avoid corrupting card names
   const stockPromises  = updates.map(u => fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'updateAuditStock', itemId: u.itemId, newStock: u.newStock }) }));
   const retirePromises = retires.map(r => {
     const itemId = typeof r === 'object' ? r.itemId : r;
@@ -2300,13 +2329,11 @@ async function saveAudit() {
 
   try {
     await Promise.all([...stockPromises, ...retirePromises]);
-    // Update the local cache with the new stock values so On File reflects changes
     updates.forEach(u => {
       const cached = (itemsCache || []).find(i => String(i.ItemID) === String(u.itemId));
       if (cached) cached.StartingAtHome = u.newStock;
     });
     auditPendingValues = {};
-    // Re-render to show updated On File numbers and cleared inputs
     const q        = document.getElementById('audit-search')?.value?.toLowerCase() || '';
     const filtered = q ? (itemsCache || []).filter(i => (i.DisplayName || i.Name || '').toLowerCase().includes(q) || String(i.ItemID).includes(q)) : (itemsCache || []);
     renderAuditCards(filtered);
