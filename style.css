@@ -673,8 +673,8 @@ body {
 /* Payment card — constrained on desktop, full width on mobile */
 .rss-payment-card { max-width: 680px; padding: 1rem 1.25rem; }
 /* Partner selector card — compact */
-.rss-partner-select-card { padding: 0.75rem 1.25rem !important; }
-.rss-partner-select-card .field-label { margin-bottom: 0.35rem; }
+.rss-partner-select-card { padding: 0.5rem 1.25rem !important; }
+.rss-partner-select-card .field-label { margin-bottom: 0.3rem; }
 /* Partner header — more visual weight */
 .rss-partner-header { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.5rem 1.75rem; box-shadow: var(--shadow-sm); }
 @media (max-width: 640px) { .rss-payment-card { max-width: 100%; } }
