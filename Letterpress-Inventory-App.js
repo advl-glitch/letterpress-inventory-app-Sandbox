@@ -1548,10 +1548,10 @@ function buildPartnerInventoryHTML(name, lastVisit, salesHistory, partnerMeta) {
 
   return `
     <!-- Partner Header -->
-    <div class="partner-info-header" style="margin-bottom:1rem;">
+    <div class="partner-info-header rss-partner-header" style="margin-bottom:1rem;">
       <div>
-        <h2 id="retail-partner-name" class="partner-name">${name}</h2>
-        <p class="partner-last-visit">Last Inventory: <span id="last-visit-date">${lastVisit || 'Never'}</span></p>
+        <h2 id="retail-partner-name" class="partner-name" style="font-size:1.75rem;">${name}</h2>
+        <p class="partner-last-visit" style="font-size:0.95rem;margin-top:0.35rem;">Last Inventory: <span id="last-visit-date">${lastVisit || 'Never'}</span></p>
       </div>
       <button class="btn btn-secondary" onclick="generatePartnerReport()">📄 Generate Report</button>
     </div>
@@ -1585,8 +1585,8 @@ function buildPartnerInventoryHTML(name, lastVisit, salesHistory, partnerMeta) {
     </div>
 
     <!-- Log Actual Sales -->
-    <div class="card" style="margin-bottom:1.25rem;border-left:4px solid var(--teal);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+    <div class="card rss-payment-card" style="margin-bottom:1.25rem;border-left:4px solid var(--teal);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;flex-wrap:wrap;gap:0.5rem;">
         <div class="form-section-title" style="margin:0;">💵 Log Actual Consignment Payment</div>
       </div>
       <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;">
