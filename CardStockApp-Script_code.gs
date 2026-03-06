@@ -61,7 +61,6 @@ function doPost(e) {
   switch (action) {
     case 'addItem':                  result = addItem(payload.itemData, payload.printRunData); break;
     case 'updateItem':               result = updateItem(payload.itemData); break;
-    case 'updateAuditStock':         result = updateAuditStock(payload.itemId, payload.newStock); break;
     case 'addPrintRun':              result = addPrintRun(payload.itemId, payload.quantity, payload.date); break;
     case 'addVendingMachine':        result = addVendingMachine(payload.machineData); break;
     case 'updateVendingMachine':     result = updateVendingMachine(payload.machineData); break;
@@ -105,7 +104,7 @@ function getItems() {
     // Attach tag IDs to each item so the frontend can filter by tag
     const tagMap = getItemTagsMap();
     items.forEach(item => {
-      item._tagIds = tagMap[String(item.ItemID)] || [];
+      item._tagIds = tagMap[String(parseInt(item.ItemID, 10))] || [];
     });
 
     return { success: true, items };
@@ -343,7 +342,7 @@ function getItemTags(itemId) {
     const data = sheet.getDataRange().getValues();
     data.shift(); // remove header
     const tagIds = data
-      .filter(row => String(row[0]) === String(itemId))
+      .filter(row => String(parseInt(row[0], 10)) === String(parseInt(itemId, 10)))
       .map(row => row[1]);
     return { success: true, tagIds };
   } catch (e) {
@@ -359,7 +358,7 @@ function getItemTagsMap() {
     data.shift();
     const map = {};
     data.forEach(row => {
-      const itemId = String(row[0]);
+      const itemId = String(parseInt(row[0], 10));
       if (!map[itemId]) map[itemId] = [];
       map[itemId].push(row[1]);
     });
@@ -753,7 +752,7 @@ function getPublicStock() {
           totalStock: parseInt(item.StartingAtHome) || 0,
           pending: pending,
           available: available,
-          tags: tagMap[String(item.ItemID)] || [],
+          tags: tagMap[String(parseInt(item.ItemID, 10))] || [],
           wholesalePrice: getWholesalePrice(item.ProductType),
         };
       })
@@ -1385,29 +1384,6 @@ function updateItemStatus(payload) {
       }
     }
     return { success: false, error: 'Item not found' };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
-}
-// =============================================================================
-// AUDIT STOCK UPDATE
-// =============================================================================
-function updateAuditStock(itemId, newStock) {
-  try {
-    const sheet = SPREADSHEET.getSheetByName('Items');
-    if (!sheet) return { success: false, error: 'Sheet "Items" not found.' };
-    const data     = sheet.getDataRange().getValues();
-    const headers  = data[0];
-    const idIndex  = headers.indexOf('ItemID');
-    const stockIdx = headers.indexOf('StartingAtHome');
-    if (stockIdx === -1) return { success: false, error: 'StartingAtHome column not found.' };
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][idIndex]) === String(itemId)) {
-        sheet.getRange(i + 1, stockIdx + 1).setValue(parseInt(newStock) || 0);
-        return { success: true };
-      }
-    }
-    return { success: false, error: 'Item not found.' };
   } catch (e) {
     return { success: false, error: e.message };
   }

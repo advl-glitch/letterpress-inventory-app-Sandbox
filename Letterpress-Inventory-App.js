@@ -949,7 +949,7 @@ function openEditItemModal(itemId) {
         status.className  = 'form-status success';
         status.textContent = '✅ Design updated!';
         showToast('Design updated!', 'success');
-        setTimeout(() => { closeModal(); closeDetailPanel(); renderInventoryPage(); }, 1200);
+        setTimeout(() => { closeModal(); closeDetailPanel(); renderMasterItemsPage(); }, 1200);
       } else throw new Error(result.error);
     } catch (err) {
       status.className  = 'form-status error';
