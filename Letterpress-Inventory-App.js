@@ -1590,9 +1590,20 @@ function buildPartnerInventoryHTML(name, lastVisit, salesHistory, partnerMeta) {
         <div class="form-section-title" style="margin:0;">💵 Log Actual Consignment Payment</div>
       </div>
       <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;">
-        <div class="form-field" style="flex:1;min-width:160px;margin:0;">
+        <div class="form-field" style="flex:1;min-width:220px;margin:0;">
           <label class="field-label">Month / Period</label>
-          <input class="field-input" type="month" id="actual-sale-month" value="${new Date().toISOString().slice(0,7)}">
+          <div style="display:flex;gap:0.5rem;">
+            <select class="field-input" id="actual-sale-month-name" style="flex:1.5;">
+              ${['January','February','March','April','May','June','July','August','September','October','November','December']
+                .map((m, i) => `<option value="${String(i+1).padStart(2,'0')}" ${i+1 === new Date().getMonth()+1 ? 'selected' : ''}>${m}</option>`).join('')}
+            </select>
+            <select class="field-input" id="actual-sale-year" style="flex:1;">
+              ${[0,1,2].map(offset => {
+                const y = new Date().getFullYear() - offset;
+                return `<option value="${y}" ${offset === 0 ? 'selected' : ''}>${y}</option>`;
+              }).join('')}
+            </select>
+          </div>
         </div>
         <div class="form-field" style="flex:1;min-width:160px;margin:0;">
           <label class="field-label">Actual Payment Received ($)</label>
@@ -1745,8 +1756,10 @@ async function savePartnerInventory() {
 }
 
 async function saveActualSale() {
-  const month  = document.getElementById('actual-sale-month')?.value;
-  const amount = parseFloat(document.getElementById('actual-sale-amount')?.value);
+  const monthName = document.getElementById('actual-sale-month-name')?.value;
+  const year      = document.getElementById('actual-sale-year')?.value;
+  const month     = year && monthName ? `${year}-${monthName}` : null;
+  const amount    = parseFloat(document.getElementById('actual-sale-amount')?.value);
   const status = document.getElementById('actual-sale-status');
   if (!month || isNaN(amount)) { status.className = 'form-status error'; status.textContent = '❌ Please enter a valid month and amount.'; return; }
   status.className = 'form-status loading'; status.textContent = 'Saving...';
