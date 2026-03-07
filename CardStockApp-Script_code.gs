@@ -611,14 +611,23 @@ function updatePartnerInventory(payload) {
 
     const today = visitDate || new Date().toLocaleDateString('en-CA');
 
+    // Ensure headers exist — getPartnerInventory reads by header name
+    const firstRow = inventorySheet.getRange(1, 1, 1, inventorySheet.getLastColumn()).getValues()[0];
+    const hasHeaders = firstRow[0] === 'LocationID';
+    if (!hasHeaders || inventorySheet.getLastColumn() === 0) {
+      inventorySheet.getRange(1, 1, 1, 12).setValues([[
+        'LocationID', 'PartnerName', 'VisitDate', 'ItemID', 'DesignName',
+        'StartOnShelf', 'Added', 'Pulled', 'EndOnShelf', 'EstimatedSold', 'UnitPrice', 'EntryType'
+      ]]);
+    }
+
     updates.forEach(u => {
-      // Write a new row for each design with visit date and new shelf count
       inventorySheet.appendRow([
-        partnerId,
-        partnerName,
-        today,
-        u.designId,
-        u.designName,
+        partnerId,        // LocationID
+        partnerName,      // PartnerName
+        today,            // VisitDate
+        u.designId,       // ItemID
+        u.designName,     // DesignName
         u.previousStock,  // StartOnShelf
         u.added || 0,     // Added
         u.pulled || 0,    // Pulled
