@@ -547,7 +547,11 @@ function getPartnerInventory(locationId) {
 
     const allItems = getItems().items;
     const itemNames = allItems.reduce((acc, item) => {
-      acc[item.ItemID] = item.DisplayName || item.Name;
+      acc[parseInt(item.ItemID)] = item.DisplayName || item.Name;
+      return acc;
+    }, {});
+    const itemPrices = allItems.reduce((acc, item) => {
+      acc[parseInt(item.ItemID)] = parseFloat(item.UnitPrice) || 0;
       return acc;
     }, {});
 
@@ -584,8 +588,9 @@ function getPartnerInventory(locationId) {
                rowDate.toDateString() === mostRecentDate.toDateString();
       })
       .map(row => ({
-        designId: row[itemIdIndex],
-        designName: itemNames[row[itemIdIndex]] || 'Unknown Design',
+        designId:   row[itemIdIndex],
+        designName: itemNames[parseInt(row[itemIdIndex])] || 'Unknown Design',
+        unitPrice:  itemPrices[parseInt(row[itemIdIndex])] || 0,
         currentStock: row[endOnShelfIndex] || 0
       }));
 
