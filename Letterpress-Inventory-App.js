@@ -1461,6 +1461,7 @@ async function handleAddNewItem(event) {
       showToast('Design added!', 'success');
       // If came from inventory page, go back there; otherwise reload add new design
       setTimeout(async () => {
+        if (sessionStorage.getItem('pba_current_page') !== 'new-item-design') return;
         if (window._cameFromInventory) {
           window._cameFromInventory = false;
           document.querySelector('[data-page="main-inventory"]')?.click();
