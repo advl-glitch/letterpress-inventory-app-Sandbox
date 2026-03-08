@@ -97,11 +97,18 @@ function getItems() {
     const data = sheet.getDataRange().getValues();
     const headers = data.shift();
 
+    const tagMap = getItemTagsMap();
+
     const items = data.map(row => {
       const item = {};
       headers.forEach((header, i) => { item[header] = row[i]; });
+      // ItemIDs in sheet are plain integers (no leading zeros) — convert to string
+      if (item.ItemID !== undefined && item.ItemID !== '') {
+        item.ItemID = String(item.ItemID);
+      }
+      item._tagIds = tagMap[item.ItemID] || [];
       return item;
-    }).filter(item => item.ItemID);
+    }).filter(item => item.ItemID && item.ItemID.trim() !== '');
 
     return { success: true, items };
   } catch (e) {
@@ -125,7 +132,7 @@ function getNextItemId() {
       if (!isNaN(id) && id > maxId) maxId = id;
     });
 
-    const nextId = String(maxId + 1).padStart(3, '0');
+    const nextId = String(maxId + 1); // plain integer — JS display layer adds padding
     return { success: true, nextId };
   } catch (e) {
     return { success: false, error: e.message };
@@ -138,7 +145,8 @@ function addItem(itemData, printRunData) {
     if (!itemsSheet) return { success: false, error: 'Sheet "Items" not found.' };
 
     const now = new Date().toISOString();
-    const displayName = itemData.itemId + ' — ' + itemData.designName;
+    const itemIdDisplay = String(itemData.itemId).padStart(3, '0');
+    const displayName = itemIdDisplay + ' — ' + itemData.designName;
 
     itemsSheet.appendRow([
       itemData.itemId,
@@ -188,7 +196,7 @@ function updateItem(itemData) {
         const rowNum = i + 1;
         const fieldMap = {
           'Name': itemData.designName,
-          'DisplayName': itemData.itemId + ' — ' + itemData.designName,
+          'DisplayName': String(parseInt(itemData.itemId,10)).padStart(3,'0') + ' — ' + itemData.designName,
           'Photo': itemData.photo,
           'ProductType': itemData.itemType,
           'UnitPrice': itemData.unitPrice,
@@ -316,14 +324,12 @@ function saveItemTags(itemId, tags) {
       sheet = SPREADSHEET.insertSheet('ItemTags');
       sheet.appendRow(['ItemID', 'TagID']);
     }
-
     const data = sheet.getDataRange().getValues();
     const rowsToDelete = [];
     for (let i = data.length - 1; i >= 1; i--) {
       if (String(data[i][0]) === String(itemId)) rowsToDelete.push(i + 1);
     }
     rowsToDelete.forEach(r => sheet.deleteRow(r));
-
     tags.forEach(tagId => sheet.appendRow([itemId, tagId]));
     return true;
   } catch (e) {
@@ -381,7 +387,7 @@ function getRetailPartners() {
         storePhoto: row[idx['StorePhotoURL']],
         notes: row[idx['Notes']],
       }))
-      .filter(p => p.locationType === 'retail_partner' && p.active === true);
+      .filter(p => p.locationType === 'retail_partner' && (p.active === true || String(p.active).toUpperCase() === 'TRUE'));
 
     const choices = partners.map(p => ({
       value: p.locationId,
