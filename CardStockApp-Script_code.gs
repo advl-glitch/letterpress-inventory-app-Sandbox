@@ -212,7 +212,6 @@ function addItem(itemData, printRunData) {
       'StartingAtHome': printRunData ? parseInt(printRunData.quantity) || 0 : 0,
       'StartingApproxTotal': 0,
       'StartingOutConsignmentEst': 0,
-      'Status': 'Open',
     };
     Object.entries(fieldMap).forEach(([col, val]) => {
       const idx = headers.indexOf(col);

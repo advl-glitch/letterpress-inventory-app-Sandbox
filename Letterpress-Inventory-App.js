@@ -1439,7 +1439,7 @@ async function handleAddNewItem(event) {
   }
   const payload      = {
     action: 'addItem',
-    itemData: { itemId: rawData.itemId, designName: rawData.designName, itemType: rawData.itemType, unitPrice: rawData.unitPrice, photo: fixPhotoUrl(rawData.photo), notes: rawData.notes, dateAdded: rawData.dateAdded, tags: selectedTags },
+    itemData: { itemId: rawData.itemId, designName: rawData.designName, itemType: rawData.itemType, unitPrice: rawData.unitPrice, photo: fixPhotoUrl(rawData.photo), notes: rawData.notes, dateAdded: rawData.dateAdded, status: 'Open', tags: selectedTags },
     printRunData: { itemId: rawData.itemId, quantity: rawData.firstRun, date: rawData.dateAdded }
   };
   try {
