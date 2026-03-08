@@ -1320,12 +1320,12 @@ async function handleAddNewItem(event) {
       status.textContent = `✅ "${rawData.designName}" added successfully!`;
       showToast('Design added!', 'success');
       // If came from inventory page, go back there; otherwise reload add new design
-      setTimeout(() => {
+      setTimeout(async () => {
         if (window._cameFromInventory) {
           window._cameFromInventory = false;
           document.querySelector('[data-page="main-inventory"]')?.click();
         } else {
-          renderNewItemDesignPage();
+          await renderNewItemDesignPage();
         }
       }, 1500);
     } else throw new Error(result.error);
@@ -1538,10 +1538,10 @@ function renderInventoryCards() {
 
   const visible = retailInventoryState.filter(item => {
     if (item.isNew) return true;
-    // Hide if all cards pulled out
-    if (item.pulled > 0 && item.pulled >= item.previousStock && !item.added) return false;
-    // Hide if stock set to 0 with no adds
-    if (item.currentStock === 0 && !item.added) return false;
+    // Calculate what the final stock will be after save
+    const finalStock = Math.max(0, (item.currentStock || 0) + (item.added || 0) - (item.pulled || 0));
+    // Hide if final stock is 0 (all cards pulled/accounted for)
+    if (finalStock === 0) return false;
     return true;
   });
 
@@ -1657,7 +1657,7 @@ function openAddDesignToPartnerModal() {
       <label class="field-label">Select Design *</label>
       <select class="field-input" id="add-partner-design-select">
         <option value="" disabled selected>Search or select...</option>
-        ${available.map(i => `<option value="${i.ItemID}" data-price="${i.UnitPrice || 0}">${i.ItemID} — ${i.DisplayName || i.Name}</option>`).join('')}
+        ${available.map(i => `<option value="${i.ItemID}" data-price="${i.UnitPrice || 0}">${i.DisplayName || i.Name}</option>`).join('')}
       </select>
     </div>
     <div class="form-grid">
@@ -1667,7 +1667,7 @@ function openAddDesignToPartnerModal() {
       </div>
       <div class="form-field">
         <label class="field-label">Retail Price</label>
-        <input class="field-input" type="number" id="add-partner-price" placeholder="Auto-filled" step="0.01" min="0">
+        <input class="field-input" type="number" id="add-partner-price" placeholder="Auto-filled" step="0.01" min="0" readonly style="background:var(--cream);color:var(--brown-mid);">
       </div>
     </div>
     <button class="btn btn-primary" style="width:100%;margin-top:0.5rem" onclick="confirmAddDesignToPartner()">✚ Add to Inventory</button>
