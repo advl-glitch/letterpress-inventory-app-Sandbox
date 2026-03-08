@@ -1421,12 +1421,22 @@ async function handleAddNewItem(event) {
     if (!newName) { status.className = 'form-status error'; status.textContent = '❌ Please enter a name for the new type.'; if (btnWrap) btnWrap.style.display = ''; return; }
     rawData.itemType = newName;
     rawData.unitPrice = newPrice ? parseFloat(newPrice).toFixed(2) : rawData.unitPrice;
-    // Save the new product type to the sheet (fire-and-forget)
+    // Save the new product type and create a matching Format tag
     fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'addProductType', typeData: { typeName: newName, retailPrice: rawData.unitPrice } }) });
+    const tagRes = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'addTag', tagData: { tagName: newName, category: 'Format' } }) });
+    const tagResult = await tagRes.json();
+    if (tagResult.success && tagResult.tagId) {
+      rawData._newFormatTagId = tagResult.tagId;
+    }
+    tagsCache = null;
   }
   // Auto-format price to 2 decimals
   if (rawData.unitPrice) rawData.unitPrice = parseFloat(rawData.unitPrice).toFixed(2);
   const selectedTags = [...document.querySelectorAll('.new-tag-check:checked')].map(c => c.value);
+  // Include the new format tag if we just created one
+  if (rawData._newFormatTagId && !selectedTags.includes(rawData._newFormatTagId)) {
+    selectedTags.push(rawData._newFormatTagId);
+  }
   const payload      = {
     action: 'addItem',
     itemData: { itemId: rawData.itemId, designName: rawData.designName, itemType: rawData.itemType, unitPrice: rawData.unitPrice, photo: fixPhotoUrl(rawData.photo), notes: rawData.notes, dateAdded: rawData.dateAdded, tags: selectedTags },
