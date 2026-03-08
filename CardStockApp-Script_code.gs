@@ -31,6 +31,7 @@ function doGet(e) {
     case 'getProductTypes':      result = getProductTypes(); break;
     case 'getNextItemId':        result = getNextItemId(); break;
     case 'getRetailPartners':    result = getRetailPartners(); break;
+    case 'getRetailerAuth':      result = getRetailerAuth(e.parameter.locationId); break;
     case 'getPartnerInventory':  result = getPartnerInventory(e.parameter.partnerId); break;
     case 'getPartnerSalesHistory': result = getPartnerSalesHistory(e.parameter.partnerId); break;
     case 'getVendingMachines':   result = getVendingMachines(); break;
@@ -71,6 +72,7 @@ function doPost(e) {
     case 'deleteTag':                result = deleteTag(payload.tagId); break;
     case 'submitOrder':              result = submitOrder(payload.orderData); break;
     case 'fulfillOrder':             result = fulfillOrder(payload.orderId, payload.adjustments, payload.notifData); break;
+    case 'unfulfillOrder':           result = unfulfillOrder(payload.orderId); break;
     case 'sendRestockNotification':  result = sendRestockNotification(payload.notifData); break;
     case 'submitPartnerRequest':     result = submitPartnerRequest(payload.requestData); break;
     case 'verifyRetailer':           result = verifyRetailer(payload.locationId, payload.email, payload.phone); break;
@@ -546,10 +548,29 @@ function updateRetailPartner(partnerData) {
             sheet.getRange(rowNum, colIndex + 1).setValue(val);
           }
         });
+        if (partnerData.ownerEmail !== undefined || partnerData.ownerPhone !== undefined) {
+          saveRetailerVerificationInfo(partnerData.locationId, partnerData.ownerEmail, partnerData.ownerPhone);
+        }
         return { success: true, message: 'Partner updated.' };
       }
     }
     return { success: false, error: 'Partner not found.' };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function getRetailerAuth(locationId) {
+  try {
+    const sheet = SPREADSHEET.getSheetByName('RetailerAuth');
+    if (!sheet) return { success: true, ownerEmail: '', ownerPhone: '' };
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(locationId)) {
+        return { success: true, ownerEmail: data[i][1] || '', ownerPhone: data[i][2] || '' };
+      }
+    }
+    return { success: true, ownerEmail: '', ownerPhone: '' };
   } catch (e) {
     return { success: false, error: e.message };
   }
@@ -1095,6 +1116,32 @@ function fulfillOrder(orderId, adjustments, notifData) {
         }
 
         return { success: true, message: 'Order fulfilled.' };
+      }
+    }
+    return { success: false, error: 'Order not found.' };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// unfulfillOrder — sets a fulfilled order back to Pending (does NOT restore stock)
+function unfulfillOrder(orderId) {
+  try {
+    const sheet = SPREADSHEET.getSheetByName('Orders');
+    if (!sheet) return { success: false, error: 'Orders sheet not found.' };
+
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const idIdx        = headers.indexOf('OrderID');
+    const statusIdx    = headers.indexOf('Status');
+    const fulfilledIdx = headers.indexOf('FulfilledAt');
+
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idIdx]) === String(orderId)) {
+        const rowNum = i + 1;
+        sheet.getRange(rowNum, statusIdx + 1).setValue('Pending');
+        if (fulfilledIdx !== -1) sheet.getRange(rowNum, fulfilledIdx + 1).setValue('');
+        return { success: true, message: 'Order set back to Pending.' };
       }
     }
     return { success: false, error: 'Order not found.' };

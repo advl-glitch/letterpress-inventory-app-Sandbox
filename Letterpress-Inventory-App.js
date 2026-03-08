@@ -187,6 +187,13 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================================
 // TOAST
 // ============================================================
+function formatPhoneField(input) {
+  const digits = input.value.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) input.value = digits;
+  else if (digits.length <= 6) input.value = digits.slice(0,3) + '-' + digits.slice(3);
+  else input.value = digits.slice(0,3) + '-' + digits.slice(3,6) + '-' + digits.slice(6);
+}
+
 function showToast(message, type = '') {
   const toast = document.getElementById('toast');
   toast.textContent = message;
@@ -1798,9 +1805,15 @@ function openPartnerDetail(partnerId) {
     </div>`);
 }
 
-function openEditPartnerModal(partnerId) {
+async function openEditPartnerModal(partnerId) {
   const partner = (partnersCache || []).find(p => p.value === partnerId);
   if (!partner) return;
+  let ownerEmail = '', ownerPhone = '';
+  try {
+    const r = await fetch(`${GOOGLE_SCRIPT_URL}?action=getRetailerAuth&locationId=${partnerId}`);
+    const d = await r.json();
+    if (d.success) { ownerEmail = d.ownerEmail || ''; ownerPhone = d.ownerPhone || ''; }
+  } catch (e) {}
   openModal(`
     <div class="modal-title">✏️ Edit Partner</div>
     <form id="edit-partner-form">
@@ -1813,10 +1826,10 @@ function openEditPartnerModal(partnerId) {
       <div class="form-field"><label class="field-label">Contact Name</label><input class="field-input" type="text" name="contactName" value="${partner.contactName || ''}"></div>
       <div class="form-grid">
         <div class="form-field"><label class="field-label">Contact Email</label><input class="field-input" type="email" name="contactEmail" value="${partner.contactEmail || ''}"></div>
-        <div class="form-field"><label class="field-label">Store Phone</label><input class="field-input" type="tel" name="contactPhone" value="${partner.contactPhone || partner.phone || ''}"></div>
+        <div class="form-field"><label class="field-label">Store Phone</label><input class="field-input" type="tel" name="contactPhone" value="${partner.contactPhone || partner.phone || ''}" oninput="formatPhoneField(this)"></div>
       </div>
-      <div class="form-field"><label class="field-label">Owner Email <span style="color:var(--teal)">(Private)</span></label><input class="field-input" type="email" name="ownerEmail" placeholder="Never shown to public"></div>
-      <div class="form-field"><label class="field-label">Owner Cell <span style="color:var(--teal)">(Private)</span></label><input class="field-input" type="tel" name="ownerPhone" placeholder="Never shown to public"></div>
+      <div class="form-field"><label class="field-label">Owner Email <span style="color:var(--teal)">(Private — for order verification)</span></label><input class="field-input" type="email" name="ownerEmail" value="${ownerEmail}" placeholder="Never shown to public"></div>
+      <div class="form-field"><label class="field-label">Owner Cell <span style="color:var(--teal)">(Private — for order verification)</span></label><input class="field-input" type="tel" name="ownerPhone" value="${ownerPhone}" placeholder="Never shown to public" oninput="formatPhoneField(this)"></div>
       <div class="form-field"><label class="field-label">Notes</label><input class="field-input" type="text" name="notes" value="${partner.notes || ''}"></div>
       <button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Changes</button>
       <div id="edit-partner-status" class="form-status"></div>
@@ -1853,10 +1866,10 @@ function openAddPartnerModal() {
       <div class="form-field"><label class="field-label">Contact Name</label><input class="field-input" type="text" name="contactName" placeholder="Primary contact"></div>
       <div class="form-grid">
         <div class="form-field"><label class="field-label">Contact Email</label><input class="field-input" type="email" name="contactEmail" placeholder="email@store.com"></div>
-        <div class="form-field"><label class="field-label">Store Phone</label><input class="field-input" type="tel" name="contactPhone" placeholder="(555) 000-0000"></div>
+        <div class="form-field"><label class="field-label">Store Phone</label><input class="field-input" type="tel" name="contactPhone" placeholder="555-444-1111" oninput="formatPhoneField(this)"></div>
       </div>
       <div class="form-field"><label class="field-label">Owner Email <span style="color:var(--teal);font-size:0.75rem">(Private — for order verification)</span></label><input class="field-input" type="email" name="ownerEmail" placeholder="Their personal email"></div>
-      <div class="form-field"><label class="field-label">Owner Cell <span style="color:var(--teal);font-size:0.75rem">(Private — for order verification)</span></label><input class="field-input" type="tel" name="ownerPhone" placeholder="Their personal cell"></div>
+      <div class="form-field"><label class="field-label">Owner Cell <span style="color:var(--teal);font-size:0.75rem">(Private — for order verification)</span></label><input class="field-input" type="tel" name="ownerPhone" placeholder="555-444-1111" oninput="formatPhoneField(this)"></div>
       <div class="form-field"><label class="field-label">Notes</label><input class="field-input" type="text" name="notes" placeholder="Any additional notes"></div>
       <button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Partner</button>
       <div id="partner-form-status" class="form-status"></div>
@@ -2207,53 +2220,157 @@ function filterOrders(status, btn) {
   renderOrdersList(filtered);
 }
 
+function renderOrderCard(o) {
+  const isPending    = o.Status === 'Pending';
+  const isWholesale  = o.PartnerType === 'wholesale';
+  const submittedDate = o.SubmittedAt ? new Date(o.SubmittedAt).toLocaleDateString() : '—';
+  return `
+    <div class="order-card ${isPending ? 'order-pending' : ''}">
+      <div class="order-card-header">
+        <div>
+          <div class="order-id">${o.OrderID}</div>
+          <div class="order-partner">${o.PartnerName || '—'}</div>
+          <div class="order-meta">${submittedDate} · ${o.SubmitterName || '—'} (${o.SubmitterEmail || '—'})</div>
+        </div>
+        <div style="text-align:right;">
+          <span class="badge ${isPending ? 'badge-amber' : 'badge-green'}">${o.Status}</span>
+          <div style="margin-top:0.3rem;">
+            <span class="badge ${isWholesale ? 'badge-teal' : 'badge-coral'}">${isWholesale ? 'Wholesale' : 'Consignment'}</span>
+          </div>
+        </div>
+      </div>
+      <div class="order-items-list">
+        ${(o.items || []).map(item => `
+          <div class="order-item-row">
+            <span class="order-item-id">#${item.itemId}</span>
+            <span class="order-item-name">${item.designName}</span>
+            <span class="order-item-qty">× ${item.qty}</span>
+            ${isWholesale ? `<span class="order-item-price">$${((item.wholesalePrice || 2) * item.qty).toFixed(2)}</span>` : ''}
+          </div>`).join('')}
+      </div>
+      ${isWholesale ? `
+        <div class="order-totals">
+          <div>Subtotal: <strong>$${o.SubTotal || '—'}</strong></div>
+          <div>Tax (5.3%): <strong>$${o.TaxAmount || '—'}</strong></div>
+          <div>Est. Total: <strong>$${o.EstTotal || '—'}</strong></div>
+        </div>` : ''}
+      ${isPending ? `
+        <div class="order-actions">
+          <button class="btn btn-primary btn-sm" onclick="openFulfillModal('${o.OrderID}')">✓ Fulfill Order</button>
+        </div>` : `
+        <div class="order-fulfilled-note" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+          <span>Fulfilled ${o.FulfilledAt ? new Date(o.FulfilledAt).toLocaleDateString() : ''}</span>
+          <button class="btn btn-secondary btn-sm" onclick="undoFulfillment('${o.OrderID}')" style="font-size:0.75rem;padding:0.25rem 0.6rem;">↩ Undo</button>
+        </div>`}
+    </div>`;
+}
+
 function renderOrdersList(orders) {
   const container = document.getElementById('orders-container');
   if (!orders || orders.length === 0) {
     container.innerHTML = `<div class="dog-state">${dogEmpty('No orders yet.')}</div>`;
     return;
   }
-  container.innerHTML = orders.map(o => {
-    const isPending    = o.Status === 'Pending';
-    const isWholesale  = o.PartnerType === 'wholesale';
-    const submittedDate = o.SubmittedAt ? new Date(o.SubmittedAt).toLocaleDateString() : '—';
-    return `
-      <div class="order-card ${isPending ? 'order-pending' : ''}">
-        <div class="order-card-header">
-          <div>
-            <div class="order-id">${o.OrderID}</div>
-            <div class="order-partner">${o.PartnerName || '—'}</div>
-            <div class="order-meta">${submittedDate} · ${o.SubmitterName || '—'} (${o.SubmitterEmail || '—'})</div>
+
+  const pending   = orders.filter(o => o.Status === 'Pending');
+  const fulfilled = orders.filter(o => o.Status !== 'Pending');
+
+  // Group fulfilled by year
+  const fulfilledByYear = {};
+  fulfilled.forEach(o => {
+    const year = o.FulfilledAt ? new Date(o.FulfilledAt).getFullYear() : (o.SubmittedAt ? new Date(o.SubmittedAt).getFullYear() : 'Unknown');
+    if (!fulfilledByYear[year]) fulfilledByYear[year] = [];
+    fulfilledByYear[year].push(o);
+  });
+  const sortedYears = Object.keys(fulfilledByYear).sort((a, b) => b - a);
+
+  let html = '';
+
+  // Pending orders section
+  if (pending.length > 0) {
+    html += `<div class="orders-section-label" style="font-size:0.85rem;font-weight:600;color:var(--amber-dark);margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem;">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block;"></span>
+      Pending (${pending.length})
+    </div>`;
+    html += pending.map(o => renderOrderCard(o)).join('');
+  } else {
+    html += `<div style="text-align:center;padding:1.5rem;color:var(--brown-light);font-size:0.875rem;">No pending orders</div>`;
+  }
+
+  // Divider
+  if (fulfilled.length > 0) {
+    html += `<div style="border-top:2px solid var(--brown-200);margin:1.5rem 0;"></div>`;
+
+    // Fulfilled header — collapsible
+    html += `<div class="orders-section-label" style="font-size:0.85rem;font-weight:600;color:var(--green-dark,var(--teal-dark));margin-bottom:0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.5rem;user-select:none;"
+      onclick="toggleFulfilledSection()">
+      <svg id="fulfilled-chevron" width="14" height="14" viewBox="0 0 14 14" fill="none" style="transition:transform 0.2s;transform:rotate(-90deg);">
+        <path d="M4.5 2.5L9.5 7L4.5 11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Fulfilled (${fulfilled.length})
+    </div>`;
+
+    html += `<div id="fulfilled-orders-section" style="display:none;">`;
+
+    sortedYears.forEach(year => {
+      const yearOrders = fulfilledByYear[year];
+      html += `
+        <div class="fulfilled-year-group" style="margin-bottom:1rem;">
+          <div style="font-size:0.8rem;font-weight:600;color:var(--brown-mid);cursor:pointer;display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0;user-select:none;"
+            onclick="toggleYearGroup('${year}')">
+            <svg class="year-chevron" id="year-chevron-${year}" width="12" height="12" viewBox="0 0 14 14" fill="none" style="transition:transform 0.2s;transform:rotate(-90deg);">
+              <path d="M4.5 2.5L9.5 7L4.5 11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            ${year} (${yearOrders.length})
           </div>
-          <div style="text-align:right;">
-            <span class="badge ${isPending ? 'badge-amber' : 'badge-green'}">${o.Status}</span>
-            <div style="margin-top:0.3rem;">
-              <span class="badge ${isWholesale ? 'badge-teal' : 'badge-coral'}">${isWholesale ? 'Wholesale' : 'Consignment'}</span>
-            </div>
+          <div id="year-group-${year}" style="display:none;">
+            ${yearOrders.map(o => renderOrderCard(o)).join('')}
           </div>
-        </div>
-        <div class="order-items-list">
-          ${(o.items || []).map(item => `
-            <div class="order-item-row">
-              <span class="order-item-id">#${item.itemId}</span>
-              <span class="order-item-name">${item.designName}</span>
-              <span class="order-item-qty">× ${item.qty}</span>
-              ${isWholesale ? `<span class="order-item-price">$${((item.wholesalePrice || 2) * item.qty).toFixed(2)}</span>` : ''}
-            </div>`).join('')}
-        </div>
-        ${isWholesale ? `
-          <div class="order-totals">
-            <div>Subtotal: <strong>$${o.SubTotal || '—'}</strong></div>
-            <div>Tax (5.3%): <strong>$${o.TaxAmount || '—'}</strong></div>
-            <div>Est. Total: <strong>$${o.EstTotal || '—'}</strong></div>
-          </div>` : ''}
-        ${isPending ? `
-          <div class="order-actions">
-            <button class="btn btn-primary btn-sm" onclick="openFulfillModal('${o.OrderID}')">✓ Fulfill Order</button>
-          </div>` : `
-          <div class="order-fulfilled-note">✅ Fulfilled ${o.FulfilledAt ? new Date(o.FulfilledAt).toLocaleDateString() : ''}</div>`}
-      </div>`;
-  }).join('');
+        </div>`;
+    });
+
+    html += `</div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function toggleFulfilledSection() {
+  const section = document.getElementById('fulfilled-orders-section');
+  const chevron = document.getElementById('fulfilled-chevron');
+  if (!section) return;
+  const isHidden = section.style.display === 'none';
+  section.style.display = isHidden ? 'block' : 'none';
+  if (chevron) chevron.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(-90deg)';
+}
+
+function toggleYearGroup(year) {
+  const group   = document.getElementById('year-group-' + year);
+  const chevron = document.getElementById('year-chevron-' + year);
+  if (!group) return;
+  const isHidden = group.style.display === 'none';
+  group.style.display = isHidden ? 'block' : 'none';
+  if (chevron) chevron.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(-90deg)';
+}
+
+async function undoFulfillment(orderId) {
+  if (!confirm('Undo fulfillment for ' + orderId + '? This will set the order back to Pending. (Stock will NOT be automatically restored.)')) return;
+  try {
+    showToast('Undoing fulfillment...', 'info');
+    const r = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'unfulfillOrder', orderId })
+    });
+    const result = await r.json();
+    if (result.success) {
+      showToast('Order set back to Pending!', 'success');
+      renderOrdersPage();
+    } else {
+      showToast('Error: ' + result.error, 'error');
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  }
 }
 
 // ============================================================
