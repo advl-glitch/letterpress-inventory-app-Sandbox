@@ -40,7 +40,6 @@ function doGet(e) {
     case 'getPublicStock':       result = getPublicStock(); break;
     case 'searchRetailers':      result = searchRetailers(e.parameter.query); break;
     case 'getDashboardStats':    result = getDashboardStats(); break;
-    case 'debugHeaders':         result = debugHeaders(); break;
     default:
       result = { success: false, error: 'Invalid action: ' + action };
   }
@@ -168,7 +167,10 @@ function addProductType(typeData) {
     if (!sheet) return { success: false, error: 'Sheet "ProductType" not found.' };
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const newRow = new Array(headers.length).fill('');
+    // Generate TypeID by removing spaces (e.g. "Dog House" → "DogHouse")
+    const typeId = typeData.typeName.replace(/\s+/g, '');
     const fieldMap = {
+      'TypeID': typeId,
       'TypeName': typeData.typeName,
       'Name': typeData.typeName,
       'DefaultRetailPrice': typeData.retailPrice,
@@ -1499,52 +1501,6 @@ function sendRetailerConfirmation(orderId, orderData, subTotal, taxAmount, estTo
 
 
 // =============================================================================
-// VENDING MACHINE REMOVAL NOTIFICATIONS (Time-based trigger)
-// =============================================================================
-
-function checkRemovalDates() {
-  try {
-    const result = getVendingMachines();
-    if (!result.success) return;
-
-    const today = new Date();
-    today.setHours(0,0,0,0);
-
-    result.machines.forEach(machine => {
-      if (!machine.RemovalDate || machine.Status === 'In Storage' || machine.RemovedDate) return;
-      if (!machine.NotifyActive) return;
-
-      const removalDate = new Date(machine.RemovalDate);
-      removalDate.setHours(0,0,0,0);
-      const daysOut = Math.round((removalDate - today) / (1000 * 60 * 60 * 24));
-
-      if ([7, 3, 1, 0].includes(daysOut)) {
-        const subject = daysOut === 0
-          ? `🚨 TODAY — Remove ${machine.MachineName} from ${machine.VenueName}`
-          : `⏰ ${daysOut} day${daysOut === 1 ? '' : 's'} — ${machine.MachineName} removal upcoming`;
-
-        const body = `
-          <h2>Vending Machine Removal Reminder</h2>
-          <p><strong>Machine:</strong> ${machine.MachineName}</p>
-          <p><strong>Venue:</strong> ${machine.VenueName} — ${machine.VenueCity}</p>
-          <p><strong>Removal Date:</strong> ${machine.RemovalDate}</p>
-          <p><strong>Days Until Removal:</strong> ${daysOut === 0 ? 'TODAY' : daysOut}</p>
-          ${machine.ResidencyNotes ? `<p><strong>Notes:</strong> ${machine.ResidencyNotes}</p>` : ''}
-        `;
-
-        if (machine.NotifyEmail) {
-          MailApp.sendEmail({ to: machine.NotifyEmail, subject, htmlBody: body });
-        }
-        if (machine.NotifyPhone) {
-          MailApp.sendEmail({ to: machine.NotifyPhone, subject: '', body: `${machine.MachineName} removal: ${daysOut === 0 ? 'TODAY' : daysOut + ' days'} — ${machine.VenueName}` });
-        }
-      }
-    });
-  } catch (e) {}
-}
-
-
-// =============================================================================
 // DASHBOARD STATS
 // =============================================================================
 
@@ -1645,24 +1601,3 @@ function updateItemStatus(payload) {
   }
 }
 
-function debugHeaders() {
-  try {
-    const sheet = SPREADSHEET.getSheetByName('Items');
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    // Also grab row for item 29
-    const data = sheet.getDataRange().getValues();
-    let item29 = null;
-    const idIdx = headers.indexOf('ItemID');
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][idIdx]) === '29') {
-        const row = {};
-        headers.forEach((h, j) => { row[h] = data[i][j]; });
-        item29 = row;
-        break;
-      }
-    }
-    return { success: true, headers, photoIndex: headers.indexOf('Photo'), item29 };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
-}
