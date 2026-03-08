@@ -890,7 +890,7 @@ function openEditItemModal(itemId) {
       <div id="edit-item-status" class="form-status"></div>
     </form>`);
 
-  loadTagsForEdit('edit-tags-container', []);
+  loadTagsForEdit('edit-tags-container', item._tagIds || []);
   document.getElementById('edit-item-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const status       = document.getElementById('edit-item-status');
