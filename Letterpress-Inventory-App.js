@@ -599,7 +599,7 @@ async function renderMasterItemsPage() {
       </div>
       <div class="page-actions">
         <button class="btn btn-secondary" onclick="itemsCache=null;renderMasterItemsPage()" title="Refresh list">↺ Refresh</button>
-        <button class="btn btn-primary" onclick="document.querySelector('[data-page=new-item-design]').click()">✚ Add Design</button>
+        <button class="btn btn-primary" onclick="window._cameFromInventory=true;document.querySelector('[data-page=new-item-design]').click()">✚ Add Design</button>
       </div>
     </div>
     <div class="items-toolbar">
@@ -793,7 +793,7 @@ function renderItemsGrid(items) {
     container.innerHTML = `
       <div class="dog-state">
         ${dogEmpty('No designs yet')}
-        <button class="btn btn-primary" style="margin-top:1rem" onclick="document.querySelector('[data-page=new-item-design]').click()">✚ Add Design</button>
+        <button class="btn btn-primary" style="margin-top:1rem" onclick="window._cameFromInventory=true;document.querySelector('[data-page=new-item-design]').click()">✚ Add Design</button>
       </div>`;
     return;
   }
@@ -916,7 +916,7 @@ function openEditItemModal(itemId) {
           <option value="Retired" ${item.Status === 'Retired' ? 'selected' : ''}>Retired</option>
         </select>
       </div>
-      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Changes</button>
+      <div id="edit-item-btn-wrap"><button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Changes</button></div>
       <div id="edit-item-status" class="form-status"></div>
     </form>`);
 
@@ -924,6 +924,7 @@ function openEditItemModal(itemId) {
   document.getElementById('edit-item-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const status       = document.getElementById('edit-item-status');
+    const btnWrap      = document.getElementById('edit-item-btn-wrap');
     const fd           = new FormData(e.target);
     const selectedTags = [...document.querySelectorAll('.edit-tag-check:checked')].map(c => c.value);
     const payload      = {
@@ -934,6 +935,7 @@ function openEditItemModal(itemId) {
         notes: fd.get('notes'), status: fd.get('status'), tags: selectedTags,
       }
     };
+    if (btnWrap) btnWrap.style.display = 'none';
     status.className = 'form-status loading';
     status.textContent = 'Saving...';
     try {
@@ -949,6 +951,7 @@ function openEditItemModal(itemId) {
     } catch (err) {
       status.className  = 'form-status error';
       status.textContent = '❌ ' + err.message;
+      if (btnWrap) btnWrap.style.display = '';
     }
   });
 }
@@ -1023,6 +1026,14 @@ async function handleAddPhotoUpload(input) {
         const result = await r.json();
         if (result.success && result.url) {
           if (urlInput) urlInput.value = result.url;
+          // Show preview
+          let previewWrap = document.querySelector('.add-photo-preview-wrap');
+          if (!previewWrap) {
+            previewWrap = document.createElement('div');
+            previewWrap.className = 'add-photo-preview-wrap photo-preview-wrap';
+            document.querySelector('#add-photo-url')?.before(previewWrap);
+          }
+          previewWrap.innerHTML = `<img class="photo-preview-thumb" src="${result.url}" alt="Uploaded photo">`;
           if (statusEl) { statusEl.textContent = '✅ Photo ready!'; statusEl.style.color = 'var(--green)'; }
         } else throw new Error(result.error);
       } catch (err) {
@@ -1257,7 +1268,7 @@ async function renderNewItemDesignPage() {
             <label class="field-label">Notes</label>
             <input class="field-input" type="text" name="notes" placeholder="Any additional notes">
           </div>
-          <button type="submit" class="btn btn-primary btn-lg" style="width:100%">✚ Add This Design</button>
+          <div id="add-design-btn-wrap"><button type="submit" class="btn btn-primary btn-lg" style="width:100%">✚ Add This Design</button></div>
           <div id="form-status" class="form-status"></div>
         </form>
       </div>`;
@@ -1288,6 +1299,8 @@ async function handleAddNewItem(event) {
   event.preventDefault();
   const form     = event.target;
   const status   = document.getElementById('form-status');
+  const btnWrap  = document.getElementById('add-design-btn-wrap');
+  if (btnWrap) btnWrap.style.display = 'none';
   status.className  = 'form-status loading';
   status.textContent = 'Saving design...';
   const formData     = new FormData(form);
@@ -1305,12 +1318,21 @@ async function handleAddNewItem(event) {
       itemsCache = null;
       status.className  = 'form-status success';
       status.textContent = `✅ "${rawData.designName}" added successfully!`;
-      form.reset();
       showToast('Design added!', 'success');
+      // If came from inventory page, go back there; otherwise reload add new design
+      setTimeout(() => {
+        if (window._cameFromInventory) {
+          window._cameFromInventory = false;
+          document.querySelector('[data-page="main-inventory"]')?.click();
+        } else {
+          renderNewItemDesignPage();
+        }
+      }, 1500);
     } else throw new Error(result.error);
   } catch (e) {
     status.className  = 'form-status error';
     status.textContent = `❌ Error: ${e.message}`;
+    if (btnWrap) btnWrap.style.display = '';
   }
 }
 
@@ -1358,7 +1380,7 @@ async function renderPrintStockUpdaterPage() {
               </div>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary btn-lg" style="width:100%">🖨️ Log Print Run</button>
+          <div id="print-run-btn-wrap"><button type="submit" class="btn btn-primary btn-lg" style="width:100%">🖨️ Log Print Run</button></div>
           <div id="form-status" class="form-status"></div>
         </form>
       </div>`;
@@ -1374,6 +1396,8 @@ async function handleAddPrintRun(event) {
   event.preventDefault();
   const form     = event.target;
   const status   = document.getElementById('form-status');
+  const btnWrap  = document.getElementById('print-run-btn-wrap');
+  if (btnWrap) btnWrap.style.display = 'none';
   status.className  = 'form-status loading';
   status.textContent = 'Saving print run...';
   const formData = new FormData(form);
@@ -1390,6 +1414,7 @@ async function handleAddPrintRun(event) {
   } catch (e) {
     status.className  = 'form-status error';
     status.textContent = `❌ Error: ${e.message}`;
+    if (btnWrap) btnWrap.style.display = '';
   }
 }
 
@@ -1831,14 +1856,16 @@ async function openEditPartnerModal(partnerId) {
       <div class="form-field"><label class="field-label">Owner Email <span style="color:var(--teal)">(Private — for order verification)</span></label><input class="field-input" type="email" name="ownerEmail" value="${ownerEmail}" placeholder="Never shown to public"></div>
       <div class="form-field"><label class="field-label">Owner Cell <span style="color:var(--teal)">(Private — for order verification)</span></label><input class="field-input" type="tel" name="ownerPhone" value="${ownerPhone}" placeholder="Never shown to public" oninput="formatPhoneField(this)"></div>
       <div class="form-field"><label class="field-label">Notes</label><input class="field-input" type="text" name="notes" value="${partner.notes || ''}"></div>
-      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Changes</button>
+      <div id="edit-partner-btn-wrap"><button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Changes</button></div>
       <div id="edit-partner-status" class="form-status"></div>
     </form>`);
 
   document.getElementById('edit-partner-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const status = document.getElementById('edit-partner-status');
-    const fd     = new FormData(e.target);
+    const status  = document.getElementById('edit-partner-status');
+    const btnWrap = document.getElementById('edit-partner-btn-wrap');
+    const fd      = new FormData(e.target);
+    if (btnWrap) btnWrap.style.display = 'none';
     status.className  = 'form-status loading'; status.textContent = 'Saving...';
     try {
       const r      = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'updateRetailPartner', partnerData: { locationId: partnerId, storeName: fd.get('storeName'), city: fd.get('city'), split: fd.get('split'), address: fd.get('address'), contactName: fd.get('contactName'), contactEmail: fd.get('contactEmail'), contactPhone: fd.get('contactPhone'), ownerEmail: fd.get('ownerEmail'), ownerPhone: fd.get('ownerPhone'), notes: fd.get('notes') } }) });
@@ -1849,7 +1876,7 @@ async function openEditPartnerModal(partnerId) {
         showToast('Partner updated!', 'success');
         setTimeout(() => { closeModal(); closeDetailPanel(); renderRetailPartnersPage(); }, 1200);
       } else throw new Error(result.error);
-    } catch (err) { status.className = 'form-status error'; status.textContent = '❌ ' + err.message; }
+    } catch (err) { status.className = 'form-status error'; status.textContent = '❌ ' + err.message; if (btnWrap) btnWrap.style.display = ''; }
   });
 }
 
@@ -1871,14 +1898,16 @@ function openAddPartnerModal() {
       <div class="form-field"><label class="field-label">Owner Email <span style="color:var(--teal);font-size:0.75rem">(Private — for order verification)</span></label><input class="field-input" type="email" name="ownerEmail" placeholder="Their personal email"></div>
       <div class="form-field"><label class="field-label">Owner Cell <span style="color:var(--teal);font-size:0.75rem">(Private — for order verification)</span></label><input class="field-input" type="tel" name="ownerPhone" placeholder="555-444-1111" oninput="formatPhoneField(this)"></div>
       <div class="form-field"><label class="field-label">Notes</label><input class="field-input" type="text" name="notes" placeholder="Any additional notes"></div>
-      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Partner</button>
+      <div id="add-partner-btn-wrap"><button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Partner</button></div>
       <div id="partner-form-status" class="form-status"></div>
     </form>`);
 
   document.getElementById('add-partner-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const status = document.getElementById('partner-form-status');
-    const fd     = new FormData(e.target);
+    const status  = document.getElementById('partner-form-status');
+    const btnWrap = document.getElementById('add-partner-btn-wrap');
+    const fd      = new FormData(e.target);
+    if (btnWrap) btnWrap.style.display = 'none';
     status.className  = 'form-status loading'; status.textContent = 'Saving...';
     try {
       const r      = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'addRetailPartner', partnerData: { storeName: fd.get('storeName'), city: fd.get('city'), split: fd.get('split'), address: fd.get('address'), contactName: fd.get('contactName'), contactEmail: fd.get('contactEmail'), contactPhone: fd.get('contactPhone'), ownerEmail: fd.get('ownerEmail'), ownerPhone: fd.get('ownerPhone'), notes: fd.get('notes') } }) });
@@ -1889,7 +1918,7 @@ function openAddPartnerModal() {
         showToast('Partner added!', 'success');
         setTimeout(() => { closeModal(); renderRetailPartnersPage(); }, 1200);
       } else throw new Error(result.error);
-    } catch (err) { status.className = 'form-status error'; status.textContent = '❌ ' + err.message; }
+    } catch (err) { status.className = 'form-status error'; status.textContent = '❌ ' + err.message; if (btnWrap) btnWrap.style.display = ''; }
   });
 }
 
@@ -2029,7 +2058,7 @@ function openAddMachineModal() {
       <div class="form-field"><label class="field-label">Address</label><input class="field-input" type="text" name="venueAddress" placeholder="Street address"></div>
       <div class="form-grid">
         <div class="form-field"><label class="field-label">Contact Name</label><input class="field-input" type="text" name="contactName"></div>
-        <div class="form-field"><label class="field-label">Contact Phone</label><input class="field-input" type="tel" name="contactPhone"></div>
+        <div class="form-field"><label class="field-label">Contact Phone</label><input class="field-input" type="tel" name="contactPhone" oninput="formatPhoneField(this)"></div>
       </div>
       <div class="form-field"><label class="field-label">Contact Email</label><input class="field-input" type="email" name="contactEmail"></div>
       <div class="form-grid">
@@ -2038,24 +2067,26 @@ function openAddMachineModal() {
       </div>
       <div class="form-grid">
         <div class="form-field"><label class="field-label">Notify Email</label><input class="field-input" type="email" name="notifyEmail"></div>
-        <div class="form-field"><label class="field-label">Notify Phone (SMS)</label><input class="field-input" type="tel" name="notifyPhone"></div>
+        <div class="form-field"><label class="field-label">Notify Phone (SMS)</label><input class="field-input" type="tel" name="notifyPhone" oninput="formatPhoneField(this)"></div>
       </div>
       <div class="form-field"><label class="field-label">Residency Notes</label><input class="field-input" type="text" name="residencyNotes"></div>
-      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Machine</button>
+      <div id="add-machine-btn-wrap"><button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Machine</button></div>
       <div id="machine-form-status" class="form-status"></div>
     </form>`);
 
   document.getElementById('add-machine-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const status = document.getElementById('machine-form-status');
-    const fd     = new FormData(e.target);
+    const status  = document.getElementById('machine-form-status');
+    const btnWrap = document.getElementById('add-machine-btn-wrap');
+    const fd      = new FormData(e.target);
+    if (btnWrap) btnWrap.style.display = 'none';
     status.className  = 'form-status loading'; status.textContent = 'Saving...';
     try {
       const r      = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'addVendingMachine', machineData: Object.fromEntries(fd.entries()) }) });
       const result = await r.json();
       if (result.success) { machinesCache = null; status.className = 'form-status success'; status.textContent = `✅ ${fd.get('machineName')} added!`; showToast('Machine added!', 'success'); setTimeout(() => { closeModal(); renderVendingMachinesPage(); }, 1200); }
       else throw new Error(result.error);
-    } catch (err) { status.className = 'form-status error'; status.textContent = '❌ ' + err.message; }
+    } catch (err) { status.className = 'form-status error'; status.textContent = '❌ ' + err.message; if (btnWrap) btnWrap.style.display = ''; }
   });
 }
 
@@ -2079,7 +2110,7 @@ function openEditMachineModal(machineId) {
       <div class="form-field"><label class="field-label">Address</label><input class="field-input" type="text" name="venueAddress" value="${m.VenueAddress || ''}"></div>
       <div class="form-grid">
         <div class="form-field"><label class="field-label">Contact Name</label><input class="field-input" type="text" name="contactName" value="${m.ContactName || ''}"></div>
-        <div class="form-field"><label class="field-label">Contact Phone</label><input class="field-input" type="tel" name="contactPhone" value="${m.ContactPhone || ''}"></div>
+        <div class="form-field"><label class="field-label">Contact Phone</label><input class="field-input" type="tel" name="contactPhone" value="${m.ContactPhone || ''}" oninput="formatPhoneField(this)"></div>
       </div>
       <div class="form-field"><label class="field-label">Contact Email</label><input class="field-input" type="email" name="contactEmail" value="${m.ContactEmail || ''}"></div>
       <div class="form-grid">
@@ -2088,24 +2119,26 @@ function openEditMachineModal(machineId) {
       </div>
       <div class="form-grid">
         <div class="form-field"><label class="field-label">Notify Email</label><input class="field-input" type="email" name="notifyEmail" value="${m.NotifyEmail || ''}"></div>
-        <div class="form-field"><label class="field-label">Notify Phone</label><input class="field-input" type="tel" name="notifyPhone" value="${m.NotifyPhone || ''}"></div>
+        <div class="form-field"><label class="field-label">Notify Phone</label><input class="field-input" type="tel" name="notifyPhone" value="${m.NotifyPhone || ''}" oninput="formatPhoneField(this)"></div>
       </div>
       <div class="form-field"><label class="field-label">Residency Notes</label><input class="field-input" type="text" name="residencyNotes" value="${m.ResidencyNotes || ''}"></div>
-      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Changes</button>
+      <div id="edit-machine-btn-wrap"><button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Changes</button></div>
       <div id="edit-machine-status" class="form-status"></div>
     </form>`);
 
   document.getElementById('edit-machine-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const status = document.getElementById('edit-machine-status');
-    const fd     = new FormData(e.target);
+    const status  = document.getElementById('edit-machine-status');
+    const btnWrap = document.getElementById('edit-machine-btn-wrap');
+    const fd      = new FormData(e.target);
+    if (btnWrap) btnWrap.style.display = 'none';
     status.className  = 'form-status loading'; status.textContent = 'Saving...';
     try {
       const r      = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'updateVendingMachine', machineData: { machineId, ...Object.fromEntries(fd.entries()) } }) });
       const result = await r.json();
       if (result.success) { machinesCache = null; status.className = 'form-status success'; status.textContent = '✅ Machine updated!'; showToast('Machine updated!', 'success'); setTimeout(() => { closeModal(); closeDetailPanel(); renderVendingMachinesPage(); }, 1200); }
       else throw new Error(result.error);
-    } catch (err) { status.className = 'form-status error'; status.textContent = '❌ ' + err.message; }
+    } catch (err) { status.className = 'form-status error'; status.textContent = '❌ ' + err.message; if (btnWrap) btnWrap.style.display = ''; }
   });
 }
 
@@ -2456,7 +2489,7 @@ function openFulfillModal(orderId) {
           </div>
         </div>` : ''}
 
-      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:1rem;">Confirm Fulfillment</button>
+      <div id="fulfill-btn-wrap"><button type="submit" class="btn btn-primary" style="width:100%;margin-top:1rem;">Confirm Fulfillment</button></div>
       <div id="fulfill-status" class="form-status"></div>
     </form>`);
 
@@ -2472,8 +2505,10 @@ function openFulfillModal(orderId) {
 
   document.getElementById('fulfill-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const status = document.getElementById('fulfill-status');
-    const fd     = new FormData(e.target);
+    const status  = document.getElementById('fulfill-status');
+    const btnWrap = document.getElementById('fulfill-btn-wrap');
+    const fd      = new FormData(e.target);
+    if (btnWrap) btnWrap.style.display = 'none';
     status.className  = 'form-status loading';
     status.textContent = 'Fulfilling...';
 
@@ -2507,6 +2542,7 @@ function openFulfillModal(orderId) {
       if (!notifData.partnerEmail) {
         status.className  = 'form-status error';
         status.textContent = '❌ Please enter a partner email address.';
+        if (btnWrap) btnWrap.style.display = '';
         return;
       }
     }
@@ -2526,6 +2562,7 @@ function openFulfillModal(orderId) {
     } catch (err) {
       status.className  = 'form-status error';
       status.textContent = '❌ ' + err.message;
+      if (btnWrap) btnWrap.style.display = '';
     }
   });
 }
