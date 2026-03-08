@@ -78,6 +78,7 @@ function doPost(e) {
     case 'submitPartnerRequest':     result = submitPartnerRequest(payload.requestData); break;
     case 'verifyRetailer':           result = verifyRetailer(payload.locationId, payload.email, payload.phone); break;
     case 'uploadPhoto':              result = uploadPhoto(payload); break;
+    case 'addProductType':           result = addProductType(payload.typeData); break;
     case 'updateItemStatus':         result = updateItemStatus(payload); break;
     case 'updatePartnerInventory':   result = updatePartnerInventory(payload); break;
     case 'logActualSale':            result = logActualSale(payload); break;
@@ -161,6 +162,30 @@ function getProductTypes() {
   }
 }
 
+function addProductType(typeData) {
+  try {
+    const sheet = SPREADSHEET.getSheetByName('ProductType');
+    if (!sheet) return { success: false, error: 'Sheet "ProductType" not found.' };
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const newRow = new Array(headers.length).fill('');
+    const fieldMap = {
+      'TypeName': typeData.typeName,
+      'Name': typeData.typeName,
+      'DefaultRetailPrice': typeData.retailPrice,
+      'RetailPrice': typeData.retailPrice,
+      'Price': typeData.retailPrice
+    };
+    Object.entries(fieldMap).forEach(([col, val]) => {
+      const idx = headers.indexOf(col);
+      if (idx !== -1) newRow[idx] = val;
+    });
+    sheet.appendRow(newRow);
+    return { success: true, message: 'Product type added.' };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
 function addItem(itemData, printRunData) {
   try {
     const itemsSheet = SPREADSHEET.getSheetByName('Items');
@@ -180,7 +205,7 @@ function addItem(itemData, printRunData) {
       'Photo': itemData.photo || '',
       'ProductType': itemData.itemType,
       'UnitPrice': itemData.unitPrice || '',
-      'Active': true,
+      'Status': 'Open',
       'Notes': itemData.notes || '',
       'Location': 'HOME',
       'CreatedAt': now,
@@ -231,7 +256,7 @@ function updateItem(itemData) {
           'ProductType': itemData.itemType,
           'UnitPrice': itemData.unitPrice,
           'Notes': itemData.notes,
-          'Active': itemData.active
+          'Status': itemData.status
         };
         // Update home stock if newStock is provided (from audit page)
         if (itemData.newStock !== undefined) {
@@ -1606,16 +1631,12 @@ function updateItemStatus(payload) {
     const headers = data[0];
     const idCol = headers.indexOf('ItemID');
     const statusCol = headers.indexOf('Status');
-    const activeCol = headers.indexOf('Active');
 
     if (statusCol === -1) return { success: false, error: 'No Status column in Items sheet' };
 
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][idCol]) === String(itemId)) {
         sheet.getRange(i + 1, statusCol + 1).setValue(status);
-        if (activeCol !== -1) {
-          sheet.getRange(i + 1, activeCol + 1).setValue(status !== 'Retired');
-        }
         return { success: true };
       }
     }
