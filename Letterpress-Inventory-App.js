@@ -937,7 +937,7 @@ function openEditItemModal(itemId) {
         status.className  = 'form-status success';
         status.textContent = '✅ Design updated!';
         showToast('Design updated!', 'success');
-        setTimeout(async () => { closeModal(); closeDetailPanel(); await fetchAndDisplayItems(); }, 1200);
+        setTimeout(async () => { closeModal(); itemsCache = null; await fetchAndDisplayItems(); openItemDetail(itemId); }, 1200);
       } else throw new Error(result.error);
     } catch (err) {
       status.className  = 'form-status error';
