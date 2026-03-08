@@ -241,6 +241,25 @@ function addPrintRun(itemId, quantity, date) {
     const runId = 'PR-' + dateStr + '-' + itemId;
 
     sheet.appendRow([runId, runDate, itemId, parseInt(quantity), '', '', '', now]);
+
+    // Update StartingAtHome on Items sheet
+    const itemsSheet = SPREADSHEET.getSheetByName('Items');
+    if (itemsSheet) {
+      const data = itemsSheet.getDataRange().getValues();
+      const headers = data[0];
+      const idIdx = headers.indexOf('ItemID');
+      const stockIdx = headers.indexOf('StartingAtHome');
+      if (idIdx !== -1 && stockIdx !== -1) {
+        for (let i = 1; i < data.length; i++) {
+          if (String(data[i][idIdx]) === String(itemId)) {
+            const current = parseInt(data[i][stockIdx]) || 0;
+            itemsSheet.getRange(i + 1, stockIdx + 1).setValue(current + parseInt(quantity));
+            break;
+          }
+        }
+      }
+    }
+
     return { success: true, message: 'Print run added for Item ' + itemId };
   } catch (e) {
     return { success: false, error: e.message };

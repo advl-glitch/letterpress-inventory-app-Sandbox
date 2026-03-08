@@ -166,6 +166,24 @@ function closeModal() {
   document.body.style.overflow = '';
 }
 
+function openSubModal(html) {
+  document.getElementById('sub-modal-content').innerHTML = html;
+  document.getElementById('sub-modal-overlay').style.display = '';
+  document.getElementById('sub-modal-overlay').classList.add('open');
+}
+
+function closeSubModal() {
+  document.getElementById('sub-modal-overlay').classList.remove('open');
+  document.getElementById('sub-modal-overlay').style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('sub-modal-close')?.addEventListener('click', closeSubModal);
+  document.getElementById('sub-modal-overlay')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('sub-modal-overlay')) closeSubModal();
+  });
+});
+
 // ============================================================
 // TOAST
 // ============================================================
@@ -1035,7 +1053,7 @@ async function loadTagsForEdit(containerId, selectedTagIds) {
 }
 
 function openAddTagModal() {
-  openModal(`
+  openSubModal(`
     <div class="modal-title">+ Add New Tag</div>
     <form id="add-tag-form">
       <div class="form-field">
@@ -1065,7 +1083,18 @@ function openAddTagModal() {
         tagsCache = null;
         status.className  = 'form-status success';
         status.textContent = '✅ Tag added!';
-        setTimeout(() => closeModal(), 1000);
+        // Reload tags in the edit form if it's open
+        const editContainer = document.getElementById('edit-tags-container');
+        if (editContainer) {
+          const currentlyChecked = [...document.querySelectorAll('.edit-tag-check:checked')].map(c => c.value);
+          loadTagsForEdit('edit-tags-container', currentlyChecked);
+        }
+        const newContainer = document.getElementById('new-tags-container');
+        if (newContainer) {
+          const currentlyChecked = [...document.querySelectorAll('.new-tag-check:checked')].map(c => c.value);
+          loadTagsForEdit('new-tags-container', currentlyChecked);
+        }
+        setTimeout(() => closeSubModal(), 1000);
       } else throw new Error(result.error);
     } catch (err) {
       status.className  = 'form-status error';
