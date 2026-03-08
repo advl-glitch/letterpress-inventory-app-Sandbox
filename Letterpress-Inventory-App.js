@@ -2478,6 +2478,13 @@ async function saveAudit() {
     await Promise.all([...stockPromises, ...retirePromises]);
     itemsCache = null;
     showToast(`✅ ${updates.length + retires.length} update(s) saved!`, 'success');
+    // Re-fetch items so audit cards render with names
+    const r = await fetch(`${GOOGLE_SCRIPT_URL}?action=getItems`);
+    const d = await r.json();
+    if (d.success) {
+      itemsCache = d.items.filter(i => i.ItemID);
+      renderAuditCards(itemsCache);
+    }
   } catch (e) {
     showToast('❌ Some updates failed — try again', '');
   }
