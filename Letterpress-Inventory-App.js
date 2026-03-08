@@ -191,9 +191,36 @@ document.addEventListener('DOMContentLoaded', () => {
 function fixPhotoUrl(url) {
   if (!url) return '';
   // Convert drive.google.com/uc?export=view&id=XXX to lh3 format
-  const match = url.match(/drive\.google\.com\/uc\?.*id=([a-zA-Z0-9_-]+)/);
-  if (match) return 'https://lh3.googleusercontent.com/d/' + match[1];
+  const match1 = url.match(/drive\.google\.com\/uc\?.*id=([a-zA-Z0-9_-]+)/);
+  if (match1) return 'https://lh3.googleusercontent.com/d/' + match1[1];
+  // Convert drive.google.com/file/d/XXX/view to lh3 format
+  const match2 = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (match2) return 'https://lh3.googleusercontent.com/d/' + match2[1];
+  // Convert drive.google.com/open?id=XXX to lh3 format
+  const match3 = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+  if (match3) return 'https://lh3.googleusercontent.com/d/' + match3[1];
   return url;
+}
+
+// Live-convert pasted Google Drive URLs and show preview
+function handlePhotoUrlPaste(inputEl, previewSelector) {
+  const raw = inputEl.value.trim();
+  const fixed = fixPhotoUrl(raw);
+  if (fixed !== raw && fixed !== '') {
+    inputEl.value = fixed;
+  }
+  // Show/update preview
+  let previewWrap = document.querySelector(previewSelector);
+  if (fixed) {
+    if (!previewWrap) {
+      previewWrap = document.createElement('div');
+      previewWrap.className = previewSelector.replace('.', '') + ' photo-preview-wrap';
+      inputEl.before(previewWrap);
+    }
+    previewWrap.innerHTML = `<img class="photo-preview-thumb" src="${fixed}" alt="Photo preview" onerror="this.parentElement.innerHTML='<span style=\\'color:var(--amber);font-size:0.75rem\\'>⚠️ Could not load image</span>'">`;
+  } else if (previewWrap) {
+    previewWrap.innerHTML = '';
+  }
 }
 
 function formatPhoneField(input) {
@@ -899,7 +926,7 @@ function openEditItemModal(itemId) {
       <div class="form-field">
         <label class="field-label">Photo</label>
         <div class="photo-upload-row">
-          <input class="field-input" type="text" name="photo" id="edit-photo-url" value="${item.Photo || ''}" placeholder="Paste URL or upload below...">
+          <input class="field-input" type="text" name="photo" id="edit-photo-url" value="${item.Photo || ''}" placeholder="Paste URL or upload below..." onchange="handlePhotoUrlPaste(this, '.photo-preview-wrap')" onpaste="setTimeout(() => handlePhotoUrlPaste(this, '.photo-preview-wrap'), 100)">
         </div>
         ${item.Photo ? `<div class="photo-preview-wrap"><img class="photo-preview-thumb" src="${fixPhotoUrl(item.Photo)}" alt="Current photo"></div>` : ''}
         <div class="photo-upload-area" onclick="document.getElementById('edit-photo-file').click()">
@@ -940,7 +967,7 @@ function openEditItemModal(itemId) {
       action: 'updateItem',
       itemData: {
         itemId, designName: fd.get('designName'), itemType: fd.get('itemType'),
-        unitPrice: fd.get('unitPrice'), photo: fd.get('photo'),
+        unitPrice: fd.get('unitPrice'), photo: fixPhotoUrl(fd.get('photo')),
         notes: fd.get('notes'), status: fd.get('status'), tags: selectedTags,
       }
     };
@@ -1311,7 +1338,7 @@ async function renderNewItemDesignPage() {
                 <div class="photo-upload-icon">📷</div>
                 <div class="photo-upload-text">Tap to take photo or choose from device</div>
               </div>
-              <input class="field-input" type="text" name="photo" id="add-photo-url" placeholder="Or paste a URL...">
+              <input class="field-input" type="text" name="photo" id="add-photo-url" placeholder="Or paste a URL..." onchange="handlePhotoUrlPaste(this, '.add-photo-preview-wrap')" onpaste="setTimeout(() => handlePhotoUrlPaste(this, '.add-photo-preview-wrap'), 100)">
               <div id="add-photo-status" style="font-size:0.75rem;margin-top:0.3rem;display:none;"></div>
             </div>
           </div>
@@ -1359,7 +1386,7 @@ async function handleAddNewItem(event) {
   const selectedTags = [...document.querySelectorAll('.new-tag-check:checked')].map(c => c.value);
   const payload      = {
     action: 'addItem',
-    itemData: { itemId: rawData.itemId, designName: rawData.designName, itemType: rawData.itemType, unitPrice: rawData.unitPrice, photo: rawData.photo, notes: rawData.notes, dateAdded: rawData.dateAdded, tags: selectedTags },
+    itemData: { itemId: rawData.itemId, designName: rawData.designName, itemType: rawData.itemType, unitPrice: rawData.unitPrice, photo: fixPhotoUrl(rawData.photo), notes: rawData.notes, dateAdded: rawData.dateAdded, tags: selectedTags },
     printRunData: { itemId: rawData.itemId, quantity: rawData.firstRun, date: rawData.dateAdded }
   };
   try {
@@ -2128,7 +2155,7 @@ function openAddMachineModal() {
           <div class="photo-upload-icon">📷</div>
           <div class="photo-upload-text">Tap to take photo or choose from device</div>
         </div>
-        <input class="field-input" type="text" name="photo" id="machine-photo-url" placeholder="Or paste a URL..." style="margin-top:0.5rem;">
+        <input class="field-input" type="text" name="photo" id="machine-photo-url" placeholder="Or paste a URL..." style="margin-top:0.5rem;" onchange="handlePhotoUrlPaste(this, '.machine-photo-preview-wrap')" onpaste="setTimeout(() => handlePhotoUrlPaste(this, '.machine-photo-preview-wrap'), 100)">
         <div id="machine-photo-status" style="font-size:0.75rem;margin-top:0.3rem;display:none;"></div>
       </div>
       <div id="add-machine-btn-wrap"><button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Machine</button></div>
@@ -2143,7 +2170,8 @@ function openAddMachineModal() {
     if (btnWrap) btnWrap.style.display = 'none';
     status.className  = 'form-status loading'; status.textContent = 'Saving...';
     try {
-      const r      = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'addVendingMachine', machineData: Object.fromEntries(fd.entries()) }) });
+      const machineData = Object.fromEntries(fd.entries()); if (machineData.photo) machineData.photo = fixPhotoUrl(machineData.photo);
+      const r      = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'addVendingMachine', machineData }) });
       const result = await r.json();
       if (result.success) { machinesCache = null; status.className = 'form-status success'; status.textContent = `✅ ${fd.get('machineName')} added!`; showToast('Machine added!', 'success'); setTimeout(() => { closeModal(); renderVendingMachinesPage(); }, 1200); }
       else throw new Error(result.error);
@@ -2191,7 +2219,7 @@ function openEditMachineModal(machineId) {
           <div class="photo-upload-icon">📷</div>
           <div class="photo-upload-text">Tap to take photo or choose from device</div>
         </div>
-        <input class="field-input" type="text" name="photo" id="machine-photo-url" value="${m.Photo || ''}" placeholder="Or paste a URL..." style="margin-top:0.5rem;">
+        <input class="field-input" type="text" name="photo" id="machine-photo-url" value="${m.Photo || ''}" placeholder="Or paste a URL..." style="margin-top:0.5rem;" onchange="handlePhotoUrlPaste(this, '.machine-photo-preview-wrap')" onpaste="setTimeout(() => handlePhotoUrlPaste(this, '.machine-photo-preview-wrap'), 100)">
         <div id="machine-photo-status" style="font-size:0.75rem;margin-top:0.3rem;display:none;"></div>
       </div>
       <div id="edit-machine-btn-wrap"><button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Changes</button></div>
@@ -2206,7 +2234,8 @@ function openEditMachineModal(machineId) {
     if (btnWrap) btnWrap.style.display = 'none';
     status.className  = 'form-status loading'; status.textContent = 'Saving...';
     try {
-      const r      = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'updateVendingMachine', machineData: { machineId, ...Object.fromEntries(fd.entries()) } }) });
+      const machineUpdate = { machineId, ...Object.fromEntries(fd.entries()) }; if (machineUpdate.photo) machineUpdate.photo = fixPhotoUrl(machineUpdate.photo);
+      const r      = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'updateVendingMachine', machineData: machineUpdate }) });
       const result = await r.json();
       if (result.success) { machinesCache = null; status.className = 'form-status success'; status.textContent = '✅ Machine updated!'; showToast('Machine updated!', 'success'); setTimeout(() => { closeModal(); closeDetailPanel(); renderVendingMachinesPage(); }, 1200); }
       else throw new Error(result.error);
