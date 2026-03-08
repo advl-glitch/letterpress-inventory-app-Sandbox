@@ -196,13 +196,18 @@ function updateItem(itemData) {
         const rowNum = i + 1;
         const fieldMap = {
           'Name': itemData.designName,
-          'DisplayName': String(parseInt(itemData.itemId,10)).padStart(3,'0') + ' — ' + itemData.designName,
+          'DisplayName': itemData.designName ? String(parseInt(itemData.itemId,10)).padStart(3,'0') + ' — ' + itemData.designName : undefined,
           'Photo': itemData.photo,
           'ProductType': itemData.itemType,
           'UnitPrice': itemData.unitPrice,
           'Notes': itemData.notes,
           'Active': itemData.active
         };
+        // Update home stock if newStock is provided (from audit page)
+        if (itemData.newStock !== undefined) {
+          const stockCol = headers.indexOf('StartingAtHome');
+          if (stockCol !== -1) sheet.getRange(rowNum, stockCol + 1).setValue(itemData.newStock);
+        }
         Object.entries(fieldMap).forEach(([field, val]) => {
           const colIndex = headers.indexOf(field);
           if (colIndex !== -1 && val !== undefined) {
