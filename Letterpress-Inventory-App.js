@@ -1698,7 +1698,7 @@ async function loadPartnerInventoryView(partnerId, partnerMeta) {
                 ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m,i) => `<option value="${String(i+1).padStart(2,'0')}" ${i === new Date().getMonth() ? 'selected' : ''}>${m}</option>`).join('')}
               </select>
               <select class="field-input" id="actual-sale-month-y" style="width:5rem;">
-                ${(() => { const y = new Date().getFullYear(); return [y-2,y-1,y].map(yr => `<option value="${yr}" ${yr===y?'selected':''}>${yr}</option>`).join(''); })()}
+                ${(() => { const y = new Date().getFullYear(); return [y-1,y].map(yr => `<option value="${yr}" ${yr===y?'selected':''}>${yr}</option>`).join(''); })()}
               </select>
             </div>
           </div>
