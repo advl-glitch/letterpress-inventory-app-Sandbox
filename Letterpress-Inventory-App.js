@@ -2082,6 +2082,11 @@ async function openEditPartnerModal(partnerId) {
         <div class="form-field"><label class="field-label">City</label><input class="field-input" type="text" name="city" value="${partner.city || ''}"></div>
         <div class="form-field"><label class="field-label">Your Revenue Split %</label><input class="field-input" type="number" name="split" value="${partner.split ? Math.round(partner.split * 100) : ''}" min="1" max="100"></div>
       </div>
+      <div class="form-field">
+        <label class="field-label">🏷️ Retail Item Codes</label>
+        <div id="sku-codes-list"></div>
+        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:0.4rem" onclick="addSkuCodeRow()">+ Add Item Code</button>
+      </div>
       <div class="form-field"><label class="field-label">Address</label><input class="field-input" type="text" name="address" value="${partner.address || ''}"></div>
       <div class="form-field"><label class="field-label">Contact Name</label><input class="field-input" type="text" name="contactName" value="${partner.contactName || ''}"></div>
       <div class="form-grid">
@@ -2091,11 +2096,6 @@ async function openEditPartnerModal(partnerId) {
       <div class="form-field"><label class="field-label">Owner Email <span style="color:var(--teal)">(Private — for order verification)</span></label><input class="field-input" type="email" name="ownerEmail" value="${ownerEmail}" placeholder="Never shown to public"></div>
       <div class="form-field"><label class="field-label">Owner Cell <span style="color:var(--teal)">(Private — for order verification)</span></label><input class="field-input" type="tel" name="ownerPhone" value="${ownerPhone}" placeholder="Never shown to public" oninput="formatPhoneField(this)"></div>
       <div class="form-field"><label class="field-label">Notes</label><input class="field-input" type="text" name="notes" value="${partner.notes || ''}"></div>
-      <div class="form-field">
-        <label class="field-label">🏷️ Retail Item Codes</label>
-        <div id="sku-codes-list"></div>
-        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:0.4rem" onclick="addSkuCodeRow()">+ Add Item Code</button>
-      </div>
       <div id="edit-partner-btn-wrap"><button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Save Changes</button></div>
       <div id="edit-partner-status" class="form-status"></div>
     </form>`);
