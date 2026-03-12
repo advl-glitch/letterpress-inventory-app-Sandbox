@@ -2905,40 +2905,46 @@ function renderMarketSalesPage() {
         <p class="page-subtitle">Log sales from art markets, pop-ups, and direct sales</p>
       </div>
     </div>
+    <div class="form-page-container">
+      <form id="mkt-sale-form">
+        <div class="form-section">
+          <div class="form-section-title">Log a Sale</div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="field-label">Date *</label>
+              <input class="field-input" type="date" id="mkt-date" value="${todayStr}" required>
+            </div>
+            <div class="form-field">
+              <label class="field-label">Market / Event Name</label>
+              <input class="field-input" type="text" id="mkt-name" placeholder="e.g. Downtown Art Walk">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="field-label">Total Sales ($) *</label>
+              <input class="field-input" type="number" id="mkt-total" step="0.01" min="0" placeholder="0.00" required>
+            </div>
+            <div class="form-field">
+              <label class="field-label">Misprint Sales ($)</label>
+              <input class="field-input" type="number" id="mkt-misprint" step="0.01" min="0" placeholder="0.00" value="0">
+            </div>
+          </div>
+          <div class="form-field">
+            <label class="field-label">Cards Sold</label>
+            <input class="field-input" type="number" id="mkt-cards" min="0" placeholder="0" style="max-width:160px;">
+          </div>
+        </div>
+        <div id="mkt-btn-wrap"><button type="submit" class="btn btn-primary btn-lg" style="width:100%">🎪 Save Market Sale</button></div>
+        <div id="mkt-status" class="form-status"></div>
+      </form>
 
-    <div class="form-card" style="max-width:560px;">
-      <h3 style="margin-bottom:1rem;color:var(--brown-dark);">Log a Sale</h3>
-      <div class="form-group">
-        <label class="form-label">Date *</label>
-        <input type="date" id="mkt-date" class="form-input" value="${todayStr}">
+      <div class="form-section" style="margin-top:1.5rem;">
+        <div class="form-section-title">Recent Sales</div>
+        <div id="mkt-history">${dogLoading('Loading sales history...')}</div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Market / Event Name <span style="color:var(--brown-light);font-weight:normal">(optional)</span></label>
-        <input type="text" id="mkt-name" class="form-input" placeholder="e.g. Downtown Art Walk">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Total Sales ($) *</label>
-        <input type="number" id="mkt-total" class="form-input" step="0.01" min="0" placeholder="0.00">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Misprint Sales ($) <span style="color:var(--brown-light);font-weight:normal">(included in total)</span></label>
-        <input type="number" id="mkt-misprint" class="form-input" step="0.01" min="0" placeholder="0.00" value="0">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Cards Sold</label>
-        <input type="number" id="mkt-cards" class="form-input" min="0" placeholder="0">
-      </div>
-      <div id="mkt-btn-wrap" style="margin-top:1rem;">
-        <button class="btn btn-primary" onclick="submitMarketSale()">Save Market Sale</button>
-      </div>
-      <div id="mkt-status" class="form-status"></div>
-    </div>
-
-    <div style="max-width:560px;margin-top:2rem;">
-      <h3 style="margin-bottom:1rem;color:var(--brown-dark);">Recent Sales</h3>
-      <div id="mkt-history">${dogLoading('Loading sales history...')}</div>
     </div>`;
 
+  document.getElementById('mkt-sale-form').addEventListener('submit', (e) => { e.preventDefault(); submitMarketSale(); });
   loadMarketSalesHistory();
 }
 
@@ -3019,11 +3025,11 @@ async function loadMarketSalesHistory() {
       const misprint = parseFloat(s.MisprintSales) || 0;
       const cards = parseInt(s.CardsSold) || 0;
       return `
-        <div class="form-card" style="margin-bottom:0.75rem;padding:0.75rem 1rem;">
+        <div class="item-card" style="padding:0.85rem 1rem;margin-bottom:0.5rem;cursor:default;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div>
-              <strong style="color:var(--brown-dark)">${name}</strong>
-              <div style="font-size:0.78rem;color:var(--brown-light)">${dateStr}${cards ? ' · ' + cards + ' cards' : ''}</div>
+              <div style="font-weight:600;color:var(--brown-dark)">${name}</div>
+              <div style="font-size:0.78rem;color:var(--brown-light);margin-top:2px">${dateStr}${cards ? ' · ' + cards + ' cards' : ''}</div>
             </div>
             <div style="text-align:right">
               <div style="font-size:1.1rem;font-weight:700;color:var(--brown-dark)">$${total.toFixed(2)}</div>
