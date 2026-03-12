@@ -1693,11 +1693,22 @@ async function loadPartnerInventoryView(partnerId, partnerMeta) {
         <div class="form-grid">
           <div class="form-field">
             <label class="field-label">Month</label>
-            <input class="field-input" type="month" id="actual-sale-month" value="${new Date().toISOString().slice(0,7)}">
+            <div style="display:flex;gap:0.4rem;">
+              <select class="field-input" id="actual-sale-month-m" style="flex:1;">
+                ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m,i) => `<option value="${String(i+1).padStart(2,'0')}" ${i === new Date().getMonth() ? 'selected' : ''}>${m}</option>`).join('')}
+              </select>
+              <select class="field-input" id="actual-sale-month-y" style="width:5rem;">
+                ${(() => { const y = new Date().getFullYear(); return [y-2,y-1,y].map(yr => `<option value="${yr}" ${yr===y?'selected':''}>${yr}</option>`).join(''); })()}
+              </select>
+            </div>
           </div>
           <div class="form-field">
             <label class="field-label">Actual Sales ($)</label>
             <input class="field-input" type="number" id="actual-sale-amount" step="0.01" min="0" placeholder="e.g. 125.50">
+          </div>
+          <div class="form-field">
+            <label class="field-label">Cards Sold</label>
+            <input class="field-input" type="number" id="actual-sale-cards" min="0" placeholder="e.g. 12">
           </div>
         </div>
         <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem;">
@@ -1716,8 +1727,9 @@ async function loadPartnerInventoryView(partnerId, partnerMeta) {
 }
 
 async function submitActualSale() {
-  const month = document.getElementById('actual-sale-month')?.value;
+  const month = (document.getElementById('actual-sale-month-y')?.value || '') + '-' + (document.getElementById('actual-sale-month-m')?.value || '');
   const amount = document.getElementById('actual-sale-amount')?.value;
+  const cardsSold = document.getElementById('actual-sale-cards')?.value;
   const status = document.getElementById('actual-sale-status');
   if (!month || !amount) { status.textContent = 'Please enter month and amount.'; status.style.color = 'var(--coral)'; return; }
   status.textContent = 'Saving...'; status.style.color = 'var(--teal)';
@@ -1727,12 +1739,14 @@ async function submitActualSale() {
       partnerId: retailCurrentPartnerId,
       partnerName: retailCurrentPartnerName,
       month: month,
-      actualSales: parseFloat(amount)
+      actualSales: parseFloat(amount),
+      cardsSold: parseInt(cardsSold) || 0
     })});
     const result = await r.json();
     if (result.success) {
       status.textContent = '✅ Saved!'; status.style.color = 'var(--green)';
       document.getElementById('actual-sale-amount').value = '';
+      document.getElementById('actual-sale-cards').value = '';
       loadSalesHistory(retailCurrentPartnerId);
     } else throw new Error(result.error);
   } catch (e) { status.textContent = '❌ ' + e.message; status.style.color = 'var(--coral)'; }
@@ -1750,10 +1764,11 @@ async function loadSalesHistory(partnerId) {
     }
     container.innerHTML = `
       <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--brown-mid);font-weight:700;margin-bottom:0.4rem;">Sales History</div>
-      <div style="display:grid;grid-template-columns:1fr auto;gap:0.2rem 1rem;font-size:0.85rem;">
+      <div style="display:grid;grid-template-columns:1fr auto auto;gap:0.2rem 1rem;font-size:0.85rem;">
         ${data.history.map(h => `
           <span style="color:var(--brown-dark)">${h.month}</span>
           <span style="font-weight:600;color:var(--green);text-align:right;">$${Number(h.actualSales || 0).toFixed(2)}</span>
+          <span style="color:var(--brown-mid);text-align:right;">${h.cardsSold ? h.cardsSold + ' cards' : '—'}</span>
         `).join('')}
       </div>`;
   } catch (e) {

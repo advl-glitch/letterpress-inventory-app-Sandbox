@@ -827,7 +827,7 @@ function getPartnerSalesHistory(partnerId) {
 
 function logActualSale(payload) {
   try {
-    const { partnerId, partnerName, month, actualSales } = payload;
+    const { partnerId, partnerName, month, actualSales, cardsSold } = payload;
 
     // Get or create RetailSales sheet
     let sheet = SPREADSHEET.getSheetByName('RetailSales');
@@ -845,13 +845,14 @@ function logActualSale(payload) {
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][pIdx]) === String(partnerId) && String(data[i][mIdx]) === String(month)) {
         sheet.getRange(i + 1, headers.indexOf('ActualSales') + 1).setValue(actualSales);
+        if (cardsSold !== undefined) sheet.getRange(i + 1, headers.indexOf('CardsSold') + 1).setValue(cardsSold);
         sheet.getRange(i + 1, headers.indexOf('LoggedAt') + 1).setValue(new Date().toISOString());
         return { success: true };
       }
     }
 
     // Append new row
-    sheet.appendRow([partnerId, partnerName, month, actualSales, 0, 0, new Date().toISOString()]);
+    sheet.appendRow([partnerId, partnerName, month, actualSales, 0, cardsSold || 0, new Date().toISOString()]);
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message };
@@ -1534,19 +1535,20 @@ function getDashboardStats() {
       });
     }
 
-    // Sum actual revenue from RetailSales sheet
+    // Sum actual revenue and cards sold from RetailSales sheet
     let totalRevenue = 0;
+    let totalSold = 0;
     try {
       const salesSheet = SPREADSHEET.getSheetByName('RetailSales');
       if (salesSheet) {
         const salesData = salesSheet.getDataRange().getValues();
         const salesHeaders = salesData.shift();
         const actualIdx = salesHeaders.indexOf('ActualSales');
-        if (actualIdx !== -1) {
-          salesData.forEach(row => {
-            totalRevenue += parseFloat(row[actualIdx]) || 0;
-          });
-        }
+        const cardsIdx = salesHeaders.indexOf('CardsSold');
+        salesData.forEach(row => {
+          if (actualIdx !== -1) totalRevenue += parseFloat(row[actualIdx]) || 0;
+          if (cardsIdx !== -1) totalSold += parseInt(row[cardsIdx]) || 0;
+        });
       }
     } catch (e) {}
 
@@ -1559,7 +1561,7 @@ function getDashboardStats() {
         totalPrinted,
         totalInStock,
         totalRevenue,
-        totalSold: 0,
+        totalSold,
         totalOnConsignment: (() => { try { const c = getConsignmentTotals(); return c.success ? c.grandTotal : 0; } catch(e) { return 0; } })(),
       }
     };
