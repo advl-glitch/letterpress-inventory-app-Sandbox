@@ -903,7 +903,8 @@ async function openItemDetail(itemId) {
     <div class="detail-stats">
       <div class="detail-stat"><div class="detail-stat-label">Retail Price</div><div class="detail-stat-value">$${Number(item.UnitPrice || 0).toFixed(2)}</div></div>
       <div class="detail-stat"><div class="detail-stat-label">Type</div><div class="detail-stat-value" style="font-size:1rem">${item.ProductType || '—'}</div></div>
-      <div class="detail-stat"><div class="detail-stat-label">In Stock</div><div class="detail-stat-value">${item.StartingAtHome || 0}</div></div>
+      <div class="detail-stat"><div class="detail-stat-label">On Hand</div><div class="detail-stat-value">${item.StartingAtHome || 0}</div></div>
+      <div class="detail-stat"><div class="detail-stat-label">At Stores</div><div class="detail-stat-value" id="detail-at-stores-${item.ItemID}" style="color:var(--teal)">...</div></div>
       <div class="detail-stat"><div class="detail-stat-label">Status</div><div class="detail-stat-value" style="font-size:1rem">${item.Status === 'Retired' ? '🪦 Retired' : item.Status === 'Limited' ? '⭐ Limited' : '✅ Open'}</div></div>
     </div>
     ${item.Notes ? `<div style="margin-bottom:1rem;font-size:0.875rem;color:var(--brown-mid);background:var(--cream);padding:0.75rem;border-radius:var(--radius-sm);">📝 ${item.Notes}</div>` : ''}
@@ -914,6 +915,15 @@ async function openItemDetail(itemId) {
       <button class="btn btn-secondary" onclick="closeDetailPanel();document.querySelector('[data-page=print-stock-updater]').click()">🖨️ Log Print Run</button>
       <button class="btn btn-secondary" onclick="closeDetailPanel()">Close</button>
     </div>`);
+  // Load consignment data for this item
+  try {
+    const ct = window._consignmentTotals || (await fetch(`${GOOGLE_SCRIPT_URL}?action=getConsignmentTotals`).then(r => r.json()).then(d => { if (d.success) { window._consignmentTotals = d.totals; return d.totals; } return {}; }));
+    const el = document.getElementById(`detail-at-stores-${item.ItemID}`);
+    if (el) el.textContent = ct[String(item.ItemID)] || 0;
+  } catch(e) {
+    const el = document.getElementById(`detail-at-stores-${item.ItemID}`);
+    if (el) el.textContent = '—';
+  }
 }
 
 function openEditItemModal(itemId) {
@@ -2946,12 +2956,15 @@ async function renderInventoryAuditorPage() {
     <div id="audit-container">${dogLoading('Loading inventory...')}</div>`;
 
   try {
-    if (!itemsCache) {
-      const r = await fetch(`${GOOGLE_SCRIPT_URL}?action=getItems`);
-      const d = await r.json();
-      if (!d.success) throw new Error(d.error);
-      itemsCache = d.items.filter(i => i.ItemID);
+    const [itemsRes, consignRes] = await Promise.all([
+      itemsCache ? Promise.resolve(null) : fetch(`${GOOGLE_SCRIPT_URL}?action=getItems`).then(r => r.json()),
+      fetch(`${GOOGLE_SCRIPT_URL}?action=getConsignmentTotals`).then(r => r.json()),
+    ]);
+    if (itemsRes) {
+      if (!itemsRes.success) throw new Error(itemsRes.error);
+      itemsCache = itemsRes.items.filter(i => i.ItemID);
     }
+    window._consignmentTotals = (consignRes && consignRes.success) ? consignRes.totals : {};
     document.getElementById('audit-search')?.addEventListener('input', (e) => {
       const q        = e.target.value.toLowerCase();
       const filtered = (itemsCache || []).filter(i => (i.DisplayName || i.Name || '').toLowerCase().includes(q) || String(i.ItemID).includes(q));
@@ -2973,6 +2986,9 @@ function setAuditSize(mode, btn) {
 }
 
 function renderAuditCard(item) {
+  const atStores = (window._consignmentTotals || {})[String(item.ItemID)] || 0;
+  const onHand = parseInt(item.StartingAtHome) || 0;
+  const total = onHand + atStores;
   return `<div class="audit-card audit-card-${auditSizeMode}">
     <div class="audit-card-info">
       <div class="audit-card-name">${item.DisplayName || item.Name}</div>
@@ -2983,8 +2999,16 @@ function renderAuditCard(item) {
       </label>
     </div>
     <div>
-      <div class="audit-card-stock">${item.StartingAtHome || '—'}</div>
-      <div class="audit-card-stock-label">On File</div>
+      <div class="audit-card-stock">${onHand || '—'}</div>
+      <div class="audit-card-stock-label">On Hand</div>
+    </div>
+    <div>
+      <div class="audit-card-stock" style="color:var(--teal)">${atStores || '—'}</div>
+      <div class="audit-card-stock-label">At Stores</div>
+    </div>
+    <div>
+      <div class="audit-card-stock" style="font-weight:700;color:var(--brown-dark)">${total}</div>
+      <div class="audit-card-stock-label">Total</div>
     </div>
     <div class="audit-input-group">
       <input type="number" class="audit-new-input" placeholder="New #" min="0" data-item-id="${item.ItemID}">

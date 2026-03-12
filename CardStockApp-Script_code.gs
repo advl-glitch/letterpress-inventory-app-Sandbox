@@ -40,6 +40,7 @@ function doGet(e) {
     case 'getPublicStock':       result = getPublicStock(); break;
     case 'searchRetailers':      result = searchRetailers(e.parameter.query); break;
     case 'getDashboardStats':    result = getDashboardStats(); break;
+    case 'getConsignmentTotals': result = getConsignmentTotals(); break;
     default:
       result = { success: false, error: 'Invalid action: ' + action };
   }
@@ -1559,9 +1560,56 @@ function getDashboardStats() {
         totalInStock,
         totalRevenue,
         totalSold: 0,
-        totalOnConsignment: 0,
+        totalOnConsignment: (() => { try { const c = getConsignmentTotals(); return c.success ? c.grandTotal : 0; } catch(e) { return 0; } })(),
       }
     };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+
+// =============================================================================
+// CONSIGNMENT TOTALS — sum of latest EndOnShelf per partner per item
+// =============================================================================
+
+function getConsignmentTotals() {
+  try {
+    const sheet = SPREADSHEET.getSheetByName('retailInventory');
+    if (!sheet) return { success: true, totals: {} };
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return { success: true, totals: {} };
+
+    const headers = data.shift();
+    const locIdx = headers.indexOf('LocationID');
+    const dateIdx = headers.indexOf('VisitDate');
+    const itemIdx = headers.indexOf('ItemID');
+    const shelfIdx = headers.indexOf('EndOnShelf');
+
+    // Find the most recent visit date per partner
+    const latestVisit = {};
+    data.forEach(row => {
+      const loc = String(row[locIdx]);
+      const d = new Date(row[dateIdx]);
+      if (!latestVisit[loc] || d > latestVisit[loc]) latestVisit[loc] = d;
+    });
+
+    // Sum EndOnShelf for each item across all partners (latest visit only)
+    const totals = {};
+    let grandTotal = 0;
+    data.forEach(row => {
+      const loc = String(row[locIdx]);
+      const d = new Date(row[dateIdx]);
+      if (d.toDateString() === latestVisit[loc].toDateString()) {
+        const itemId = String(row[itemIdx]);
+        const onShelf = parseInt(row[shelfIdx]) || 0;
+        totals[itemId] = (totals[itemId] || 0) + onShelf;
+        grandTotal += onShelf;
+      }
+    });
+
+    return { success: true, totals, grandTotal };
   } catch (e) {
     return { success: false, error: e.message };
   }
