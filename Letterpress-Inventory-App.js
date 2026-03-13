@@ -1665,7 +1665,10 @@ async function loadPartnerInventoryView(partnerId, partnerMeta) {
     const { name, lastVisit, inventory } = partnerRes.data;
     retailCurrentPartnerName = name;
 
-    retailInventoryState = (inventory || [])
+    // De-duplicate by designId (keep last entry) and filter out zero-stock
+    const deduped = new Map();
+    (inventory || []).forEach(item => deduped.set(String(item.designId), item));
+    retailInventoryState = [...deduped.values()]
       .filter(item => (item.currentStock || 0) > 0)
       .map(item => ({
         designId:      item.designId,

@@ -774,6 +774,21 @@ function updatePartnerInventory(payload) {
       ]]);
     }
 
+    // Remove existing rows for this partner + today before appending
+    const allData = inventorySheet.getDataRange().getValues();
+    const headers = allData[0];
+    const locCol = headers.indexOf('LocationID');
+    const dateCol = headers.indexOf('VisitDate');
+    // Delete from bottom up to avoid index shifting
+    for (let i = allData.length - 1; i >= 1; i--) {
+      const rowDate = allData[i][dateCol] instanceof Date
+        ? allData[i][dateCol].toLocaleDateString('en-CA')
+        : String(allData[i][dateCol]);
+      if (String(allData[i][locCol]) === String(partnerId) && rowDate === today) {
+        inventorySheet.deleteRow(i + 1);
+      }
+    }
+
     updates.forEach(u => {
       inventorySheet.appendRow([
         partnerId,        // LocationID
