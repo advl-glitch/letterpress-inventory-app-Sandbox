@@ -1902,7 +1902,7 @@ function renderInventoryCards() {
     const finalStock = Math.max(0, (item.currentStock || 0) + (item.added || 0) - (item.pulled || 0));
     const pendingRemoval = !item.isNew && finalStock === 0;
     const shortName = (item.designName || '').replace(/^\d+\s*—\s*/, '');
-    const estSold = item.isNew ? 0 : Math.max(0, item.previousStock - item.currentStock + item.added - item.pulled);
+    const estSold = item.isNew ? 0 : Math.max(0, item.previousStock - item.currentStock);
     const estRevenue = (estSold * Number(item.unitPrice || 0)).toFixed(2);
     return `
       <div class="inventory-card ${retailCardSize === 'comfy' ? 'inventory-card-comfy' : ''} ${item.isNew ? 'inventory-card-new' : ''} ${pendingRemoval ? 'inventory-card-pending-removal' : ''}">
@@ -1962,7 +1962,7 @@ function updateInventoryField(idx, field, value) {
 
   // Update estimated sold
   if (!item.isNew) {
-    const estSold = Math.max(0, item.previousStock - item.currentStock + item.added - item.pulled);
+    const estSold = Math.max(0, item.previousStock - item.currentStock);
     const estRevenue = (estSold * Number(item.unitPrice || 0)).toFixed(2);
     const estRow = cards[idx].querySelector('.est-sold-row');
     if (estRow) {
