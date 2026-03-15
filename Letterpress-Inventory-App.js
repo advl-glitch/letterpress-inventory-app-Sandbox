@@ -1909,9 +1909,6 @@ function renderInventoryCards() {
         <div class="inventory-card-info">
           <div class="design-name">${shortName}</div>
           <div class="design-id">#${item.designId} · $${Number(item.unitPrice || 0).toFixed(2)}</div>
-          <div class="est-sold-row" style="font-size:0.7rem;color:var(--brown-light);margin-top:0.2rem;">
-            ${!item.isNew ? `Est. sold: <strong style="color:${estSold > 0 ? 'var(--green)' : 'var(--brown-light)'}">${estSold > 0 ? estSold : '—'}</strong>${estSold > 0 ? ` · $${estRevenue}` : ''}` : '<em style="color:var(--teal);">New</em>'}
-          </div>
           ${pendingRemoval ? `<div class="pending-removal-banner">⚠️ Will be removed on save</div>` : ''}
         </div>
         <div class="inventory-stock-col">
@@ -1921,6 +1918,11 @@ function renderInventoryCards() {
         <div class="inventory-stock-col">
           <div class="inventory-stock-val new-stock-display" style="color:var(--teal);font-weight:700;">${finalStock}</div>
           <div class="inventory-stock-label">New Total</div>
+        </div>
+        <div class="inventory-stock-col est-sold-col" style="min-width:55px;">
+          <div class="est-sold-row" style="font-size:0.7rem;color:var(--brown-light);text-align:center;">
+            ${!item.isNew ? `<strong style="color:${estSold > 0 ? 'var(--green)' : 'var(--brown-light)'}; font-size:1.1rem;">${estSold > 0 ? estSold : '—'}</strong><br><span style="font-size:0.6rem;text-transform:uppercase;">Est. Sold</span>${estSold > 0 ? `<br><span style="color:var(--green);font-size:0.7rem;">$${estRevenue}</span>` : ''}` : '<em style="color:var(--teal);font-size:0.7rem;">New</em>'}
+          </div>
         </div>
         <div class="inventory-actions">
           <div class="action-field">
@@ -1966,7 +1968,7 @@ function updateInventoryField(idx, field, value) {
     const estRevenue = (estSold * Number(item.unitPrice || 0)).toFixed(2);
     const estRow = cards[idx].querySelector('.est-sold-row');
     if (estRow) {
-      estRow.innerHTML = `Est. sold: <strong style="color:${estSold > 0 ? 'var(--green)' : 'var(--brown-light)'}">${estSold > 0 ? estSold : '—'}</strong>${estSold > 0 ? ' · $' + estRevenue : ''}`;
+      estRow.innerHTML = `<strong style="color:${estSold > 0 ? 'var(--green)' : 'var(--brown-light)'}; font-size:1.1rem;">${estSold > 0 ? estSold : '—'}</strong><br><span style="font-size:0.6rem;text-transform:uppercase;">Est. Sold</span>${estSold > 0 ? '<br><span style="color:var(--green);font-size:0.7rem;">$' + estRevenue + '</span>' : ''}`;
     }
   }
 
