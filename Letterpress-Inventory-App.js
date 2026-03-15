@@ -2048,7 +2048,7 @@ function openAddDesignToPartnerModal() {
   new Choices('#add-partner-design-select', { searchEnabled: true, itemSelectText: '', searchPlaceholderValue: 'Type to search designs...' });
 }
 
-function confirmAddDesignToPartner() {
+async function confirmAddDesignToPartner() {
   const selectEl = document.querySelector('#add-partner-design-select');
   const designId = selectEl?.value;
   const qty      = parseInt(document.getElementById('add-partner-qty')?.value);
@@ -2061,20 +2061,56 @@ function confirmAddDesignToPartner() {
   }
 
   const item = (itemsCache || []).find(i => String(i.ItemID) === String(designId));
-  retailInventoryState.push({
-    designId,
-    designName:    item?.DisplayName || item?.Name || `Design #${designId}`,
-    unitPrice:     price || item?.UnitPrice || 0,
-    previousStock: 0,
-    currentStock:  qty,
-    pulled:        0,
-    added:         qty,
-    isNew:         true,
-  });
+  const designName = item?.DisplayName || item?.Name || `Design #${designId}`;
+  const unitPrice = price || item?.UnitPrice || 0;
 
-  closeModal();
-  renderInventoryCards();
-  showToast(`${item?.DisplayName || 'Design'} added — don't forget to Save!`, 'success');
+  // Show saving state in modal
+  status.className = 'form-status loading'; status.textContent = 'Adding to store...';
+
+  // Auto-save just this new design to the system
+  try {
+    const today = new Date().toLocaleDateString('en-CA');
+    const payload = {
+      action: 'updatePartnerInventory',
+      partnerId: retailCurrentPartnerId,
+      partnerName: retailCurrentPartnerName,
+      visitDate: today,
+      updates: [{
+        designId,
+        designName,
+        previousStock: 0,
+        newStock: qty,
+        added: qty,
+        pulled: 0,
+        estimatedSold: 0,
+        unitPrice,
+        isNew: true,
+      }],
+    };
+
+    const r = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+    const result = await r.json();
+    if (!result.success) throw new Error(result.error);
+
+    // Add to local state so it shows on the page
+    retailInventoryState.push({
+      designId,
+      designName,
+      unitPrice,
+      previousStock: 0,
+      currentStock: qty,
+      pulled: 0,
+      added: 0, // reset since it's already saved
+      isNew: false, // already persisted
+    });
+
+    itemsCache = null; // refresh home stock on next load
+    closeModal();
+    renderInventoryCards();
+    showToast(`${designName} added and saved!`, 'success');
+  } catch (e) {
+    status.className = 'form-status error'; status.textContent = '❌ ' + e.message;
+  }
 }
 
 // ============================================================
