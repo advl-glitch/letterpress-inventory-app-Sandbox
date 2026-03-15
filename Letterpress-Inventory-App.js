@@ -1902,20 +1902,29 @@ function renderInventoryCards() {
     const finalStock = Math.max(0, (item.currentStock || 0) + (item.added || 0) - (item.pulled || 0));
     const pendingRemoval = !item.isNew && finalStock === 0;
     const shortName = (item.designName || '').replace(/^\d+\s*—\s*/, '');
+    const estSold = item.isNew ? 0 : Math.max(0, item.previousStock - item.currentStock + item.added - item.pulled);
+    const estRevenue = (estSold * Number(item.unitPrice || 0)).toFixed(2);
     return `
       <div class="inventory-card ${retailCardSize === 'comfy' ? 'inventory-card-comfy' : ''} ${item.isNew ? 'inventory-card-new' : ''} ${pendingRemoval ? 'inventory-card-pending-removal' : ''}">
         <div class="inventory-card-info">
           <div class="design-name">${shortName}</div>
           <div class="design-id">#${item.designId} · $${Number(item.unitPrice || 0).toFixed(2)}</div>
+          <div class="est-sold-row" style="font-size:0.7rem;color:var(--brown-light);margin-top:0.2rem;">
+            ${!item.isNew ? `Est. sold: <strong style="color:${estSold > 0 ? 'var(--green)' : 'var(--brown-light)'}">${estSold > 0 ? estSold : '—'}</strong>${estSold > 0 ? ` · $${estRevenue}` : ''}` : '<em style="color:var(--teal);">New</em>'}
+          </div>
           ${pendingRemoval ? `<div class="pending-removal-banner">⚠️ Will be removed on save</div>` : ''}
         </div>
         <div class="inventory-stock-col">
-          <div class="inventory-stock-val current-stock" style="color:var(--teal);">${item.currentStock}</div>
-          <div class="inventory-stock-label">On Shelf</div>
+          <div class="inventory-stock-val" style="color:var(--amber);">${item.previousStock}</div>
+          <div class="inventory-stock-label">Last Visit</div>
+        </div>
+        <div class="inventory-stock-col">
+          <div class="inventory-stock-val new-stock-display" style="color:var(--teal);font-weight:700;">${finalStock}</div>
+          <div class="inventory-stock-label">New Total</div>
         </div>
         <div class="inventory-actions">
           <div class="action-field">
-            <label>Stock</label>
+            <label>Count</label>
             <input type="number" class="action-input" placeholder="#" min="0"
               value="${item.currentStock || ''}"
               oninput="updateInventoryField(${realIdx}, 'currentStock', this.value)">
@@ -1941,16 +1950,25 @@ function updateInventoryField(idx, field, value) {
   if (!retailInventoryState[idx]) return;
   retailInventoryState[idx][field] = parseInt(value) || 0;
 
-  // Update badge and pending-removal state in-place (no full re-render)
   const cards = document.querySelectorAll('.inventory-card');
   if (!cards[idx]) return;
   const item = retailInventoryState[idx];
   const finalStock = Math.max(0, (item.currentStock || 0) + (item.added || 0) - (item.pulled || 0));
   const pendingRemoval = !item.isNew && finalStock === 0;
 
-  // Update badge
-  const badge = cards[idx].querySelector('.current-stock');
-  if (badge) badge.textContent = item.currentStock || 0;
+  // Update "New Total" display
+  const newStockEl = cards[idx].querySelector('.new-stock-display');
+  if (newStockEl) newStockEl.textContent = finalStock;
+
+  // Update estimated sold
+  if (!item.isNew) {
+    const estSold = Math.max(0, item.previousStock - item.currentStock + item.added - item.pulled);
+    const estRevenue = (estSold * Number(item.unitPrice || 0)).toFixed(2);
+    const estRow = cards[idx].querySelector('.est-sold-row');
+    if (estRow) {
+      estRow.innerHTML = `Est. sold: <strong style="color:${estSold > 0 ? 'var(--green)' : 'var(--brown-light)'}">${estSold > 0 ? estSold : '—'}</strong>${estSold > 0 ? ' · $' + estRevenue : ''}`;
+    }
+  }
 
   // Update pending-removal state
   if (pendingRemoval) {
@@ -1958,8 +1976,9 @@ function updateInventoryField(idx, field, value) {
     if (!cards[idx].querySelector('.pending-removal-banner')) {
       const banner = document.createElement('div');
       banner.className = 'pending-removal-banner';
-      banner.textContent = '⚠️ Stock is 0 — this design will be removed from this store when you save.';
-      cards[idx].querySelector('.inventory-actions')?.before(banner);
+      banner.textContent = '⚠️ Will be removed on save';
+      const info = cards[idx].querySelector('.inventory-card-info');
+      if (info) info.appendChild(banner);
     }
   } else {
     cards[idx].classList.remove('inventory-card-pending-removal');
