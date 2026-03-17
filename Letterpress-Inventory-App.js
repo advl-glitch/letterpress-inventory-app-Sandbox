@@ -24,15 +24,24 @@
     return true;
   }
 
+  const MIN_SPLASH_MS = 3000;
+  const splashStart = Date.now();
+
+  function dismissAfterMinimum(callback) {
+    const elapsed = Date.now() - splashStart;
+    const remaining = Math.max(0, MIN_SPLASH_MS - elapsed);
+    setTimeout(callback || dismissSplash, remaining);
+  }
+
   if (alreadyAuthed) {
-    // Already logged in — show splash briefly then dismiss
-    setTimeout(dismissSplash, 1200);
+    // Already logged in — show splash for minimum time then dismiss
+    dismissAfterMinimum();
   } else {
-    // Show splash, then prompt password after animation finishes
-    setTimeout(() => {
+    // Show splash for minimum time, then prompt password
+    dismissAfterMinimum(() => {
       if (!promptPassword()) return;
       dismissSplash();
-    }, 1400);
+    });
   }
 })();
 // ============================================================
