@@ -1857,6 +1857,9 @@ async function submitActualSale() {
   } catch (e) { status.textContent = '❌ ' + e.message; status.style.color = 'var(--coral)'; }
 }
 
+let _salesHistoryCache = null;
+let _salesHistoryYear = null;
+
 async function loadSalesHistory(partnerId) {
   const container = document.getElementById('sales-history-container');
   if (!container) return;
@@ -1868,30 +1871,56 @@ async function loadSalesHistory(partnerId) {
       return;
     }
 
-    const totalReceived = data.history.reduce((s, h) => s + (parseFloat(h.actualSales) || 0), 0);
     const checksOnly = data.history.filter(h => (parseFloat(h.actualSales) || 0) > 0);
-
     if (checksOnly.length === 0) {
       container.innerHTML = '<p style="font-size:0.8rem;color:var(--brown-mid);margin:0;">No checks logged yet.</p>';
       return;
     }
 
-    container.innerHTML = `
-      <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--brown-mid);font-weight:700;margin-bottom:0.4rem;">Checks Received</div>
-      <div style="display:grid;grid-template-columns:1fr auto;gap:0.2rem 1rem;font-size:0.85rem;margin-bottom:0.75rem;">
-        <span style="font-size:0.7rem;text-transform:uppercase;color:var(--brown-light);font-weight:600;">Month</span>
-        <span style="font-size:0.7rem;text-transform:uppercase;color:var(--brown-light);font-weight:600;text-align:right;">Amount</span>
-        ${checksOnly.map(h => `
-          <span style="color:var(--brown-dark)">${h.month}</span>
-          <span style="font-weight:600;color:var(--green);text-align:right;">$${(parseFloat(h.actualSales) || 0).toFixed(2)}</span>
-        `).join('')}
-      </div>
-      <div style="padding:0.5rem 0.75rem;background:var(--cream);border-radius:var(--radius-sm);border:1px solid var(--border);font-size:0.8rem;">
-        <span style="color:var(--brown-mid);">Total Received:</span> <strong style="color:var(--green);">$${totalReceived.toFixed(2)}</strong>
-      </div>`;
+    _salesHistoryCache = checksOnly;
+    const years = [...new Set(checksOnly.map(h => h.month.substring(0, 4)))].sort().reverse();
+    _salesHistoryYear = _salesHistoryYear && years.includes(_salesHistoryYear) ? _salesHistoryYear : years[0];
+
+    renderSalesHistory(container, years);
   } catch (e) {
     container.innerHTML = '';
   }
+}
+
+function onSalesYearChange(val) {
+  _salesHistoryYear = val;
+  const container = document.getElementById('sales-history-container');
+  if (!container || !_salesHistoryCache) return;
+  const years = [...new Set(_salesHistoryCache.map(h => h.month.substring(0, 4)))].sort().reverse();
+  renderSalesHistory(container, years);
+}
+
+function renderSalesHistory(container, years) {
+  const filtered = _salesHistoryYear === 'all'
+    ? _salesHistoryCache
+    : _salesHistoryCache.filter(h => h.month.startsWith(_salesHistoryYear));
+  const totalReceived = filtered.reduce((s, h) => s + (parseFloat(h.actualSales) || 0), 0);
+
+  container.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+      <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--brown-mid);font-weight:700;">Checks Received</div>
+      <select onchange="onSalesYearChange(this.value)" style="font-size:0.75rem;padding:0.15rem 0.4rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--cream);color:var(--brown-dark);">
+        ${years.map(y => `<option value="${y}"${y === _salesHistoryYear ? ' selected' : ''}>${y}</option>`).join('')}
+        <option value="all"${'all' === _salesHistoryYear ? ' selected' : ''}>All</option>
+      </select>
+    </div>
+    ${filtered.length === 0 ? '<p style="font-size:0.8rem;color:var(--brown-mid);margin:0;">No checks this year.</p>' : `
+    <div style="display:grid;grid-template-columns:1fr auto;gap:0.2rem 1rem;font-size:0.85rem;margin-bottom:0.75rem;">
+      <span style="font-size:0.7rem;text-transform:uppercase;color:var(--brown-light);font-weight:600;">Month</span>
+      <span style="font-size:0.7rem;text-transform:uppercase;color:var(--brown-light);font-weight:600;text-align:right;">Amount</span>
+      ${filtered.map(h => `
+        <span style="color:var(--brown-dark)">${h.month}</span>
+        <span style="font-weight:600;color:var(--green);text-align:right;">$${(parseFloat(h.actualSales) || 0).toFixed(2)}</span>
+      `).join('')}
+    </div>
+    <div style="padding:0.5rem 0.75rem;background:var(--cream);border-radius:var(--radius-sm);border:1px solid var(--border);font-size:0.8rem;">
+      <span style="color:var(--brown-mid);">Total Received:</span> <strong style="color:var(--green);">$${totalReceived.toFixed(2)}</strong>
+    </div>`}`;
 }
 
 let retailSummaryExpanded = false;
