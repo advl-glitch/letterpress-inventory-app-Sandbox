@@ -1,1 +1,1 @@
-# letterpress-inventory-app-Sandbox
+# CardStockApp — Admin Dashboard

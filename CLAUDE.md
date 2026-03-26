@@ -1,4 +1,4 @@
-# Prints by Angel — Admin Inventory App
+# CardStockApp — Admin Dashboard
 
 ## Owner
 Angel Verde — "Prints by Angel" letterpress card business
@@ -7,10 +7,10 @@ Angel Verde — "Prints by Angel" letterpress card business
 - Vanilla JS single-page app (no framework)
 - Google Apps Script (GAS) REST backend with POST-based routing (`action` field)
 - Google Sheets as database, Google Drive for photo storage
-- GitHub Pages hosting
+- Vercel hosting (auto-deploys from GitHub `advl-glitch/cardstock-app-admin`)
 
 ## Key Files
-- `Letterpress-Inventory-App.js` — entire admin frontend
+- `cardstock-app.js` — entire admin frontend
 - `CardStockApp-Script_code.gs` — GAS backend (local copy; paste into GAS editor & redeploy)
 
 ## GAS Deployment
