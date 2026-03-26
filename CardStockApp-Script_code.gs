@@ -915,9 +915,25 @@ function updatePartnerInventory(payload) {
     }
 
     // ── 4. Roll up estimated sales into RetailSales for this visit ──
+    // Get partner split from Locations sheet
+    let partnerSplit = 1;
+    const locSheetForSplit = SPREADSHEET.getSheetByName('Locations');
+    if (locSheetForSplit) {
+      const locData = locSheetForSplit.getDataRange().getValues();
+      const locHeaders = locData[0];
+      const locIdIdx = locHeaders.indexOf('LocationID');
+      const locSplitIdx = locHeaders.indexOf('SplitToYou');
+      for (let i = 1; i < locData.length; i++) {
+        if (String(locData[i][locIdIdx]) === String(partnerId)) {
+          partnerSplit = parseFloat(locData[i][locSplitIdx]) || 1;
+          break;
+        }
+      }
+    }
+
     const totalEstimatedRevenue = updates.reduce((sum, u) => {
       const estSold = parseInt(u.estimatedSold) || 0;
-      return sum + (estSold * (parseFloat(u.unitPrice) || 0));
+      return sum + (estSold * (parseFloat(u.unitPrice) || 0) * partnerSplit);
     }, 0);
     const totalEstimatedCards = updates.reduce((sum, u) => sum + (parseInt(u.estimatedSold) || 0), 0);
 
@@ -1166,6 +1182,19 @@ function backfillEstimatedSales() {
       return null;
     };
 
+    // Load partner splits from Locations sheet
+    const partnerSplits = {};
+    const locSheet = SPREADSHEET.getSheetByName('Locations');
+    if (locSheet) {
+      const locData = locSheet.getDataRange().getValues();
+      const locHeaders = locData[0];
+      const locIdIdx = locHeaders.indexOf('LocationID');
+      const locSplitIdx = locHeaders.indexOf('SplitToYou');
+      for (let i = 1; i < locData.length; i++) {
+        partnerSplits[String(locData[i][locIdIdx])] = parseFloat(locData[i][locSplitIdx]) || 0;
+      }
+    }
+
     const estimates = {}; // key: "partnerId|YYYY-MM" → { revenue, partnerName }
     for (let i = 1; i < logData.length; i++) {
       const partnerId = String(logData[i][lIdx['LocationID']] || '');
@@ -1175,9 +1204,10 @@ function backfillEstimatedSales() {
       const unitPrice = parseFloat(logData[i][lIdx['UnitPrice']]) || 0;
 
       if (!partnerId || !month || estSold <= 0) continue;
+      const split = partnerSplits[partnerId] || 1;
       const key = partnerId + '|' + month;
       if (!estimates[key]) estimates[key] = { partnerId, partnerName, month, revenue: 0, cards: 0 };
-      estimates[key].revenue += estSold * unitPrice;
+      estimates[key].revenue += estSold * unitPrice * split;
       estimates[key].cards += estSold;
     }
 
