@@ -2258,51 +2258,50 @@ async function confirmAddDesignToPartner() {
 // STORE VISIT REPORT
 // ============================================================
 
-function previewVisitReport() {
-  // Gather pulled items and sold-out items from current inventory state
-  const pulledItems = retailInventoryState
-    .filter(item => (item.pulled || 0) > 0)
-    .map(item => ({
-      designId: item.designId,
-      designName: (item.designName || '').replace(/^\d+\s*—\s*/, ''),
-      qty: item.pulled,
-    }));
+async function previewVisitReport() {
+  showToast('Loading visit data...', '');
 
-  const soldItems = retailInventoryState
-    .filter(item => {
-      if (item.isNew) return false;
-      const finalStock = Math.max(0, (item.currentStock || 0) + (item.added || 0) - (item.pulled || 0));
-      const estSold = Math.max(0, item.previousStock - item.currentStock);
-      return finalStock === 0 && estSold > 0;
-    })
-    .map(item => {
-      const estSold = Math.max(0, item.previousStock - item.currentStock);
-      return {
-        designId: item.designId,
-        designName: (item.designName || '').replace(/^\d+\s*—\s*/, ''),
-        qty: estSold,
-        revenue: estSold * (parseFloat(item.unitPrice) || 0),
-      };
-    });
+  // Pull the latest visit data from the sheet instead of local state
+  let visitData;
+  try {
+    const r = await fetch(`${GOOGLE_SCRIPT_URL}?action=getLatestVisit&partnerId=${retailCurrentPartnerId}`);
+    visitData = await r.json();
+    if (!visitData.success) throw new Error(visitData.error);
+  } catch (e) {
+    showToast('Failed to load visit data', ''); return;
+  }
 
-  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const entries = visitData.entries || [];
+  const addedItems = entries.filter(e => (e.added || 0) > 0).map(e => ({
+    designId: e.itemId, designName: (e.designName || '').replace(/^\d+\s*—\s*/, ''), qty: e.added,
+  }));
+  const pulledItems = entries.filter(e => (e.pulled || 0) > 0).map(e => ({
+    designId: e.itemId, designName: (e.designName || '').replace(/^\d+\s*—\s*/, ''), qty: e.pulled,
+  }));
+  const soldItems = entries.filter(e => (e.estimatedSold || 0) > 0).map(e => ({
+    designId: e.itemId, designName: (e.designName || '').replace(/^\d+\s*—\s*/, ''), qty: e.estimatedSold,
+    revenue: e.estimatedSold * (parseFloat(e.unitPrice) || 0),
+  }));
 
-  // Build preview HTML
-  const pulledHtml = pulledItems.length ? `
-    <div style="font-weight:600;margin-bottom:0.5rem;color:var(--coral);">📦 Items Pulled (${pulledItems.length})</div>
-    <div style="background:var(--cream);border-radius:var(--radius-sm);padding:0.5rem;margin-bottom:1rem;">
-      ${pulledItems.map(i => `<div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
-        <span>#${i.designId} — ${i.designName}</span><strong style="color:var(--coral);">×${i.qty}</strong>
-      </div>`).join('')}
-    </div>` : '';
+  const today = visitData.visitDate
+    ? new Date(visitData.visitDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-  const soldHtml = soldItems.length ? `
-    <div style="font-weight:600;margin-bottom:0.5rem;color:var(--green);">💰 Sold Out / Removed (${soldItems.length})</div>
-    <div style="background:var(--cream);border-radius:var(--radius-sm);padding:0.5rem;margin-bottom:1rem;">
-      ${soldItems.map(i => `<div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
-        <span>#${i.designId} — ${i.designName} (×${i.qty})</span><strong style="color:var(--green);">$${i.revenue.toFixed(2)}</strong>
-      </div>`).join('')}
-    </div>` : '';
+  // Build section helper
+  const buildSection = (icon, title, color, items, showRevenue) => {
+    if (!items.length) return '';
+    return `
+      <div style="font-weight:600;margin-bottom:0.5rem;color:var(--${color});">${icon} ${title} (${items.length})</div>
+      <div style="background:var(--cream);border-radius:var(--radius-sm);padding:0.5rem;margin-bottom:1rem;">
+        ${items.map(i => `<div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+          <span>#${i.designId} — ${i.designName}</span>
+          <strong style="color:var(--${color});">${showRevenue && i.revenue ? '×' + i.qty + ' · $' + i.revenue.toFixed(2) : '×' + i.qty}</strong>
+        </div>`).join('')}
+      </div>`;
+  };
+  const addedHtml = buildSection('🆕', 'Added to Shelf', 'teal', addedItems, false);
+  const pulledHtml = buildSection('📦', 'Pulled from Shelf', 'coral', pulledItems, false);
+  const soldHtml = buildSection('💰', 'Estimated Sold', 'green', soldItems, true);
 
   // Get partner emails from cache
   const partnerMeta = window._currentPartnerMeta || {};
@@ -2315,18 +2314,18 @@ function previewVisitReport() {
 
     <div style="margin-bottom:1rem;">
       <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--brown-mid);font-weight:700;margin-bottom:0.5rem;">Preview</div>
-      <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;max-height:250px;overflow-y:auto;background:white;">
+      <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;max-height:300px;overflow-y:auto;background:white;">
+        ${addedHtml}
         ${pulledHtml}
         ${soldHtml}
-        ${!pulledHtml && !soldHtml ? `
-          <div style="font-weight:600;margin-bottom:0.5rem;color:var(--teal);">📋 Current Shelf (${retailInventoryState.length} designs)</div>
-          <div style="background:var(--cream);border-radius:var(--radius-sm);padding:0.5rem;">
-            ${retailInventoryState.map(i => {
-              const stock = Math.max(0, (i.currentStock || 0) + (i.added || 0) - (i.pulled || 0));
-              const name = (i.designName || '').replace(/^\d+\s*—\s*/, '');
-              return '<div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;"><span>#' + i.designId + ' — ' + name + '</span><strong style="color:var(--teal);">×' + stock + '</strong></div>';
-            }).join('')}
-          </div>` : ''}
+        <div style="font-weight:600;margin-bottom:0.5rem;color:var(--teal);">📋 Current Shelf (${retailInventoryState.length} designs)</div>
+        <div style="background:var(--cream);border-radius:var(--radius-sm);padding:0.5rem;">
+          ${retailInventoryState.map(i => {
+            const stock = Math.max(0, (i.currentStock || 0) + (i.added || 0) - (i.pulled || 0));
+            const name = (i.designName || '').replace(/^\d+\s*—\s*/, '');
+            return '<div style="display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;"><span>#' + i.designId + ' — ' + name + '</span><strong style="color:var(--teal);">×' + stock + '</strong></div>';
+          }).join('')}
+        </div>
       </div>
     </div>
 
@@ -2364,22 +2363,6 @@ async function sendVisitReport() {
     return;
   }
 
-  const pulledItems = retailInventoryState
-    .filter(item => (item.pulled || 0) > 0)
-    .map(item => ({ designId: item.designId, designName: (item.designName || '').replace(/^\d+\s*—\s*/, ''), qty: item.pulled }));
-
-  const soldItems = retailInventoryState
-    .filter(item => {
-      if (item.isNew) return false;
-      const finalStock = Math.max(0, (item.currentStock || 0) + (item.added || 0) - (item.pulled || 0));
-      const estSold = Math.max(0, item.previousStock - item.currentStock);
-      return finalStock === 0 && estSold > 0;
-    })
-    .map(item => {
-      const estSold = Math.max(0, item.previousStock - item.currentStock);
-      return { designId: item.designId, designName: (item.designName || '').replace(/^\d+\s*—\s*/, ''), qty: estSold, revenue: estSold * (parseFloat(item.unitPrice) || 0) };
-    });
-
   if (btnWrap) btnWrap.style.display = 'none';
   status.className = 'form-status loading'; status.textContent = 'Sending...';
 
@@ -2387,10 +2370,8 @@ async function sendVisitReport() {
     const r = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({
       action: 'sendVisitReport',
       recipientEmail,
+      partnerId: retailCurrentPartnerId,
       partnerName: retailCurrentPartnerName,
-      visitDate: new Date().toLocaleDateString('en-CA'),
-      pulledItems,
-      soldItems,
       note,
     })});
     const result = await r.json();

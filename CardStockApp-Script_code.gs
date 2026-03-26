@@ -45,6 +45,7 @@ function doGet(e) {
     case 'getMarketSales':       result = getMarketSales(); break;
     case 'getSalesReportData':   result = getSalesReportData(e.parameter); break;
     case 'migrateToPartnerStock': result = migrateToPartnerStock(); break;
+    case 'getLatestVisit':       result = getLatestVisit(e.parameter.partnerId); break;
     default:
       result = { success: false, error: 'Invalid action: ' + action };
   }
@@ -1562,13 +1563,74 @@ function sendRestockNotification(notifData) {
 
 
 // =============================================================================
-// STORE VISIT REPORT EMAIL
+// STORE VISIT DATA & REPORT EMAIL
 // =============================================================================
+
+function getLatestVisit(partnerId) {
+  try {
+    const sheet = SPREADSHEET.getSheetByName('retailInventory');
+    if (!sheet) return { success: true, entries: [], visitDate: null };
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return { success: true, entries: [], visitDate: null };
+
+    const headers = data[0];
+    const idx = {};
+    headers.forEach((h, i) => { idx[h] = i; });
+
+    // Find the latest visit date for this partner
+    let latestDate = null;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idx['LocationID']]) === String(partnerId)) {
+        const vd = String(data[i][idx['VisitDate']]);
+        if (!latestDate || vd > latestDate) latestDate = vd;
+      }
+    }
+    if (!latestDate) return { success: true, entries: [], visitDate: null };
+
+    // Get all entries for that visit
+    const entries = [];
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idx['LocationID']]) === String(partnerId) && String(data[i][idx['VisitDate']]) === latestDate) {
+        entries.push({
+          itemId: data[i][idx['ItemID']],
+          designName: data[i][idx['DesignName']],
+          startOnShelf: parseInt(data[i][idx['StartOnShelf']]) || 0,
+          endOnShelf: parseInt(data[i][idx['EndOnShelf']]) || 0,
+          estimatedSold: parseInt(data[i][idx['EstimatedSold']]) || 0,
+          added: parseInt(data[i][idx['Added']]) || 0,
+          pulled: parseInt(data[i][idx['Pulled']]) || 0,
+          unitPrice: parseFloat(data[i][idx['UnitPrice']]) || 0,
+          entryType: data[i][idx['EntryType']],
+        });
+      }
+    }
+
+    return { success: true, entries, visitDate: latestDate };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
 
 function sendVisitReport(payload) {
   try {
-    const { recipientEmail, partnerName, visitDate, pulledItems, soldItems, note } = payload;
+    const { recipientEmail, partnerId, partnerName, note } = payload;
     if (!recipientEmail) return { success: false, error: 'No email provided.' };
+
+    // Pull latest visit data from sheet
+    const visitResult = getLatestVisit(partnerId);
+    const entries = visitResult.entries || [];
+    const visitDate = visitResult.visitDate || new Date().toLocaleDateString('en-CA');
+    const pulledItems = entries.filter(e => (e.pulled || 0) > 0).map(e => ({ designId: e.itemId, designName: e.designName, qty: e.pulled }));
+    const soldItems = entries.filter(e => (e.estimatedSold || 0) > 0).map(e => ({ designId: e.itemId, designName: e.designName, qty: e.estimatedSold, revenue: e.estimatedSold * (e.unitPrice || 0) }));
+    const addedItems = entries.filter(e => (e.added || 0) > 0).map(e => ({ designId: e.itemId, designName: e.designName, qty: e.added }));
+
+    const addedRows = (addedItems || []).map(item => `
+      <tr>
+        <td style="padding:10px 12px;border-bottom:1px solid #EDE7D6;font-family:Georgia,serif;color:#4AABAB;font-weight:700;font-size:0.8rem;">#${item.designId}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #EDE7D6;color:#3D2B1F;">${item.designName}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #EDE7D6;text-align:center;font-weight:700;color:#4AABAB;font-size:1.1rem;">${item.qty}</td>
+      </tr>`).join('');
 
     const pulledRows = (pulledItems || []).map(item => `
       <tr>
@@ -1605,6 +1667,19 @@ function sendVisitReport(payload) {
             <div style="font-size:1.1rem;color:#3D2B1F;font-weight:600;">${formattedDate}</div>
           </div>
 
+          ${addedRows ? `
+          <div style="font-family:Georgia,serif;font-size:1rem;color:#3D2B1F;margin-bottom:10px;font-weight:600;">🆕 Added to Shelf</div>
+          <table style="width:100%;border-collapse:collapse;background:white;border-radius:10px;overflow:hidden;margin-bottom:20px;">
+            <thead>
+              <tr style="background:#4AABAB;color:white;">
+                <th style="padding:10px 12px;text-align:left;font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Design #</th>
+                <th style="padding:10px 12px;text-align:left;font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Name</th>
+                <th style="padding:10px 12px;text-align:center;font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Qty Added</th>
+              </tr>
+            </thead>
+            <tbody>${addedRows}</tbody>
+          </table>` : ''}
+
           ${pulledRows ? `
           <div style="font-family:Georgia,serif;font-size:1rem;color:#3D2B1F;margin-bottom:10px;font-weight:600;">📦 Items Pulled</div>
           <table style="width:100%;border-collapse:collapse;background:white;border-radius:10px;overflow:hidden;margin-bottom:20px;">
@@ -1632,8 +1707,8 @@ function sendVisitReport(payload) {
             <tbody>${soldRows}</tbody>
           </table>` : ''}
 
-          ${!pulledRows && !soldRows ? `
-          <p style="font-size:0.9rem;color:#6B4C3B;font-style:italic;">No items were pulled or sold out during this visit.</p>` : ''}
+          ${!addedRows && !pulledRows && !soldRows ? `
+          <p style="font-size:0.9rem;color:#6B4C3B;font-style:italic;">No inventory changes during this visit.</p>` : ''}
 
           ${note ? `
           <div style="background:white;border-radius:10px;padding:14px 18px;margin-bottom:24px;border-left:4px solid #E8933A;">
