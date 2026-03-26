@@ -1877,8 +1877,6 @@ async function loadSalesHistory(partnerId) {
 
     const totalActual = data.history.reduce((s, h) => s + (parseFloat(h.actualSales) || 0), 0);
     const totalEstimated = data.history.reduce((s, h) => s + (parseFloat(h.estimatedSales) || 0), 0);
-    const outstanding = Math.max(0, totalEstimated - totalActual);
-
     container.innerHTML = `
       <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--brown-mid);font-weight:700;margin-bottom:0.4rem;">Sales History</div>
       <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:0.2rem 0.75rem;font-size:0.85rem;margin-bottom:0.75rem;">
@@ -1900,7 +1898,6 @@ async function loadSalesHistory(partnerId) {
       <div style="display:flex;gap:1rem;flex-wrap:wrap;padding:0.6rem 0.75rem;background:var(--cream);border-radius:var(--radius-sm);border:1px solid var(--border);">
         <div style="font-size:0.8rem;"><span style="color:var(--brown-mid);">Total Received:</span> <strong style="color:var(--green);">$${totalActual.toFixed(2)}</strong></div>
         <div style="font-size:0.8rem;"><span style="color:var(--brown-mid);">Total Estimated:</span> <strong style="color:var(--amber);">$${totalEstimated.toFixed(2)}</strong></div>
-        ${outstanding > 0 ? `<div style="font-size:0.8rem;"><span style="color:var(--brown-mid);">Outstanding:</span> <strong style="color:var(--coral);">$${outstanding.toFixed(2)}</strong></div>` : ''}
       </div>`;
   } catch (e) {
     container.innerHTML = '';
